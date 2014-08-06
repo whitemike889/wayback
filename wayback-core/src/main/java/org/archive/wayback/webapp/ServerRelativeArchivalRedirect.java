@@ -100,7 +100,14 @@ public class ServerRelativeArchivalRedirect extends AbstractRequestHandler {
 
 		String url = remainder.substring(thirdSlash + 1);
 		url = UrlOperations.fixupScheme(url);
-		url = ArchiveUtils.addImpliedHttpIfNecessary(url);
+		
+		int colon = url.indexOf(':');
+		
+		if (colon == -1) {
+			System.out.println("referer without colon in last part is: " + referer);
+			return null;
+		}
+		//url = ArchiveUtils.addImpliedHttpIfNecessary(url);
 
 		String thisPath = httpRequest.getRequestURI();
 		String queryString = httpRequest.getQueryString();
