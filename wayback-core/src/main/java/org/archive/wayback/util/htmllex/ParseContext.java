@@ -132,7 +132,7 @@ public class ParseContext {
 	 * @return absolute form of input url, or url itself if javascript:
 	 */
 	public String contextualizeUrl(String url) {
-	    if(url.startsWith("javascript:") || url.startsWith("#")) {
+	    if(!url.startsWith("http://") || !url.startsWith("https://")) {
 	    	return url;
 	    }
 		try {
