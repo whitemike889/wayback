@@ -65,7 +65,6 @@ public interface HttpHeaderProcessor {
 	public final static String HTTP_TRANSFER_ENCODING_HEADER = "Transfer-Encoding";
 	
 	public final static String HTTP_ACCESS_CONTROL_ALLOW_ORIGIN = "Access-Control-Allow-Origin";
-	public final static String HTTP_ACCESS_CONTROL_ALLOW_ORIGIN_UP = HTTP_ACCESS_CONTROL_ALLOW_ORIGIN.toUpperCase();
 	
 	/**
 	 * Transfer-Encoding in all-uppercase

@@ -57,7 +57,6 @@ public class XArchiveHttpHeaderProcessor extends PreservingHttpHeaderProcessor {
 		passThrough.add(HTTP_CONTENT_DISP_HEADER_UP);
 		passThrough.add(HTTP_CONTENT_RANGE_HEADER_UP);
 		passThrough.add(HTTP_ACCESS_CONTROL_ALLOW_ORIGIN);
-		passThrough.add(HTTP_ACCESS_CONTROL_ALLOW_ORIGIN_UP);
 
 		prefix = DEFAULT_PREFIX;
 	}
