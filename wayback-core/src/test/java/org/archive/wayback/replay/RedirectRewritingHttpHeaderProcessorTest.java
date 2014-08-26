@@ -60,6 +60,7 @@ public class RedirectRewritingHttpHeaderProcessorTest extends TestCase {
 		assertEquals("audio/mpeg", output.get("Content-Type"));
 		assertEquals("audio/mpeg", output.get("X-Archive-Orig-Content-Type"));
 		assertEquals("*", output.get("Access-Control-Allow-Origin"));
+		assertEquals("*", output.get("X-Access-Control-Allow-Origin"));
 
 		// Content-Length and Content-Transfer-Encoding are dropped, preserved with prefix
 		assertEquals(null, output.get("Content-Length"));
