@@ -35,7 +35,6 @@ import org.archive.wayback.core.CaptureSearchResult;
  * <li>{@code Content-Type}</li>
  * <li>{@code Content-Disposition}</li>
  * <li>{@code Content-Range}</li>
- * <li>{@code ACCESS_CONTROL_ALLOW_ORIGIN}</li>
  * </ul>
  * Headers dropped if {@code prefix} is set to {@code null} or empty:
  * <ul>
@@ -56,7 +55,6 @@ public class XArchiveHttpHeaderProcessor extends PreservingHttpHeaderProcessor {
 		passThrough.add(HTTP_CONTENT_TYPE_HEADER_UP);
 		passThrough.add(HTTP_CONTENT_DISP_HEADER_UP);
 		passThrough.add(HTTP_CONTENT_RANGE_HEADER_UP);
-		passThrough.add(HTTP_ACCESS_CONTROL_ALLOW_ORIGIN);
 
 		prefix = DEFAULT_PREFIX;
 	}
