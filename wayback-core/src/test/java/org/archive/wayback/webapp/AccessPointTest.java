@@ -1,10 +1,9 @@
 /**
- * 
+ *
  */
 package org.archive.wayback.webapp;
 
 import java.io.IOException;
-import java.security.AccessControlException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
@@ -14,6 +13,7 @@ import java.util.regex.Pattern;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -24,52 +24,55 @@ import org.archive.io.ArchiveRecordHeader;
 import org.archive.io.warc.TestWARCReader;
 import org.archive.io.warc.TestWARCRecordInfo;
 import org.archive.io.warc.WARCRecord;
+import org.archive.wayback.ExceptionRenderer;
 import org.archive.wayback.QueryRenderer;
 import org.archive.wayback.ReplayDispatcher;
 import org.archive.wayback.ReplayRenderer;
 import org.archive.wayback.RequestParser;
 import org.archive.wayback.ResourceIndex;
 import org.archive.wayback.ResourceStore;
+import org.archive.wayback.ResultURIConverter;
 import org.archive.wayback.archivalurl.ArchivalUrlResultURIConverter;
 import org.archive.wayback.core.CaptureSearchResult;
 import org.archive.wayback.core.CaptureSearchResults;
 import org.archive.wayback.core.Resource;
 import org.archive.wayback.core.UrlSearchResults;
 import org.archive.wayback.core.WaybackRequest;
-import org.archive.wayback.exception.BadQueryException;
-import org.archive.wayback.exception.ResourceIndexNotAvailableException;
-import org.archive.wayback.exception.ResourceNotInArchiveException;
+import org.archive.wayback.exception.ResourceNotAvailableException;
 import org.archive.wayback.exception.WaybackException;
+import org.archive.wayback.memento.MementoHandler;
 import org.archive.wayback.memento.MementoUtils;
 import org.archive.wayback.resourcestore.resourcefile.ArcResource;
 import org.archive.wayback.resourcestore.resourcefile.WarcResource;
+import org.archive.wayback.util.url.KeyMakerUrlCanonicalizer;
 import org.archive.wayback.util.webapp.RequestMapper;
+import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.easymock.IArgumentMatcher;
 
 /**
  * unit test for {@link AccessPoint}.
- * 
+ *
  * TODO: this unit test is too complex. it is because
  * AccessPoint class has too much responsibility and many execution paths.
  * some good refactoring of AccessPoint class would help.
- * 
+ *
  * @author Kenji Nagahashi
  *
  */
 public class AccessPointTest extends TestCase {
 
     AccessPoint cut;
-    
+
     // AccessPoint public interface
     // init()
     // handleRequest()
-    // queryIndex(WaybackRequest) - actually it's only used internally. it's public just because 
+    // queryIndex(WaybackRequest) - actually it's only used internally. it's public just because
     //   LiveWebAccessPoint is reusing it. LiveWebAccessPoint also calls getReplay() for rendering
     //   resource in accordance with rendering mode configured.
     // shutdown()
-    
+
     // dependencies
     // selfRedirectCanonicalizer: UrlCanonicalizer
     // filterFactory: CustomResultFilterFactory
@@ -87,23 +90,25 @@ public class AccessPointTest extends TestCase {
     WaybackCollection collection;
     ResourceStore resourceStore;
     ResourceIndex resourceIndex;
-    
+
     HttpServletRequest httpRequest;
     HttpServletResponse httpResponse;
     RequestDispatcher requestDispatcher;
-    
+
     RequestParser parser;
     //ResultURIConverter uriConverter;
     QueryRenderer query;
     ReplayDispatcher replay;
-    
+
     WaybackRequest wbRequest;
-    
+
     ReplayRenderer replayRenderer;
-    
+
     /**
      * setup HttpServletRequest stubs
-     * @param contextPath
+     * @param contextPath servlet context path. typically {@code "/"}
+     * @param uri servlet URI. typically {@code "/"}
+     * @param contextPathPrefix
      */
     protected void setupRequestStub(String contextPath, String uri, String contextPathPrefix) {
         EasyMock.expect(httpRequest.getRequestURI()).andStubReturn(uri);
@@ -117,12 +122,12 @@ public class AccessPointTest extends TestCase {
         // used by RequestMapper#getRequestPathPrefix(HttpServletRequest)
         // typical value found in ia-wayback-projects/projects/global-wayback/configs/local/wayback.properties
         // TODO: RequestMapper#getRequestContextPath(HttpServletRequest) assumes value of this
-        // attribute ends with "/". RequestMapper has constant declaration for 
+        // attribute ends with "/". RequestMapper has constant declaration for
         // "webapp-request-context-path-prefix", but it's private.
         EasyMock.expect(
                 httpRequest.getAttribute("webapp-request-context-path-prefix"))
                 .andStubReturn(contextPathPrefix);
-        
+
         EasyMock.expect(httpRequest.getLocalName()).andStubReturn("localhost");
         // commented out because these are default behavior for stub ("Nice") mock.
         //EasyMock.expect(httpRequest.getAuthType()).andReturn(null).anyTimes();
@@ -134,11 +139,11 @@ public class AccessPointTest extends TestCase {
         EasyMock.expect(httpRequest.getRequestDispatcher(EasyMock.<String>notNull())).andStubReturn(requestDispatcher);
         //EasyMock.expect(httpRequest.getCookies()).andReturn(null).anyTimes();
     }
-    
+
     // values used in global wayback configuration.
     public static final String WEB_PREFIX = "/web/";
     public static final String STATIC_PREFIX = "/static/";
-    
+
     /* (non-Javadoc)
      * @see junit.framework.TestCase#setUp()
      */
@@ -154,26 +159,33 @@ public class AccessPointTest extends TestCase {
         cut.setReplayPrefix(WEB_PREFIX);
         cut.setQueryPrefix(WEB_PREFIX);
         cut.setStaticPrefix(STATIC_PREFIX);
-        
+
+        KeyMakerUrlCanonicalizer canonicalizer = new KeyMakerUrlCanonicalizer();
+        cut.setSelfRedirectCanonicalizer(canonicalizer);
+
         resourceStore = EasyMock.createMock(ResourceStore.class);
         resourceIndex = EasyMock.createMock(ResourceIndex.class);
         collection = new WaybackCollection();
         collection.setResourceIndex(resourceIndex);
         collection.setResourceStore(resourceStore);
         cut.setCollection(collection);
-        
+
         // behavior returning null are commented out because EasyMock provides them by default.
         httpRequest = EasyMock.createNiceMock(HttpServletRequest.class);
-        httpResponse = EasyMock.createNiceMock(HttpServletResponse.class);
+        httpResponse = EasyMock.createMock(HttpServletResponse.class);
+        // AccessPoint calls getWriter() just for committing response headers. Return value
+        // does not matter.
+        EasyMock.expect(httpResponse.getWriter()).andStubReturn(null);
+
         // RequestDispatcher - setup expectations, call replay() and verify() if
         // method calls are expected.
         requestDispatcher = EasyMock.createMock(RequestDispatcher.class);
         // Memento mode - only called when enableMemento==true.
         //EasyMock.expect(httpRequest.getHeader(MementoUtils.ACCEPT_DATETIME)).andReturn(null);
         setupRequestStub("/", "/", null);
-        
+
         // as we mock-ify RequestParser, WaybackRequest can be independent of httpRequest.
-        // it suggests HttpServletRequest method calls in setupRequestStub are better be made through 
+        // it suggests HttpServletRequest method calls in setupRequestStub are better be made through
         // RequestParser (TODO)
         //wbRequest = new WaybackRequest();
         parser = EasyMock.createMock(RequestParser.class);
@@ -185,15 +197,15 @@ public class AccessPointTest extends TestCase {
         	}
 		});
         EasyMock.replay(parser);
-        
+
         query = EasyMock.createMock(QueryRenderer.class);
         cut.setQuery(query);
-        
+
         replay = EasyMock.createMock(ReplayDispatcher.class);
         cut.setReplay(replay);
-        
+
         replayRenderer = EasyMock.createMock(ReplayRenderer.class);
-        
+
         {
             ArchivalUrlResultURIConverter uc = new ArchivalUrlResultURIConverter();
             uc.setReplayURIPrefix("/web/");
@@ -204,7 +216,7 @@ public class AccessPointTest extends TestCase {
         Logger.getLogger(ArchivalUrlResultURIConverter.class.getName()).setLevel(Level.WARNING);
         Logger.getLogger(PerfStats.class.getName()).setLevel(Level.WARNING);
     }
-    
+
     public static Resource createTestHtmlResource(String uri, String timestamp, byte[] payloadBytes) throws IOException {
         TestWARCRecordInfo recinfo = TestWARCRecordInfo.createCompressedHttpResponse("text/html", payloadBytes);
         recinfo.setCreate14DigitDateFromDT14(timestamp);
@@ -228,7 +240,21 @@ public class AccessPointTest extends TestCase {
         resource.parseHeaders();
         return resource;
     }
-    
+	public static Resource createTestRevisitResource(String timestamp, Resource revisited,
+			boolean withHeader) throws IOException {
+		String clen = revisited.getHttpHeaders().get("Content-Length");
+		int len = clen != null ? Integer.parseInt(clen) : -1;
+		TestWARCRecordInfo recinfo = TestWARCRecordInfo.createRevisitHttpResponse("text/html", len, withHeader);
+		recinfo.setCreate14DigitDateFromDT14(timestamp);
+		recinfo.addExtraHeader("WARC-Refers-To-Target-URI", ((WarcResource)revisited).getWarcHeaders().getUrl());
+		recinfo.addExtraHeader("WARC-Refers-To-Date", ((WarcResource)revisited).getWarcHeaders().getDate());
+		TestWARCReader ar = new TestWARCReader(recinfo);
+		WARCRecord rec = ar.get(0);
+		WarcResource resource = new WarcResource(rec, ar);
+		resource.parseHeaders();
+		return resource;
+	}
+
     /**
      * checks if {@code ts} has expected format (YYYYmmddHHMMSS)
      * @param ts timestamp string to check
@@ -242,7 +268,7 @@ public class AccessPointTest extends TestCase {
      * 2007-08-29T18:00:26Z => 20070829180026
      * (stolen from WARCRecordToSearchResultAdapter - move that method to ArchiveUtils!)
      * @param input date text in ISOZ format.
-     * @return date text in DT14 format. 
+     * @return date text in DT14 format.
      */
     private static String transformWARCDate(final String input) {
         StringBuilder output = new StringBuilder(14);
@@ -254,7 +280,7 @@ public class AccessPointTest extends TestCase {
         output.append(input.substring(17,19));
         return output.toString();
     }
-    
+
     /**
      * given a sequence of {@link WarcResource}s,
      * <ul>
@@ -274,8 +300,13 @@ public class AccessPointTest extends TestCase {
      */
     protected CaptureSearchResults setupCaptures(int closestIndex, Resource... resources) throws Exception {
         CaptureSearchResults results = new CaptureSearchResults();
+        CaptureSearchResult prev = null;
         for (Resource res : resources) {
             CaptureSearchResult result = new CaptureSearchResult();
+            if (prev != null) {
+				prev.setNextResult(result);
+				result.setPrevResult(prev);
+            }
             // TODO: Resource should have methods for accessing URI and date
             if (res instanceof WarcResource) {
                 // TODO: want to use WARCRecordToSearchResultAdapter? WarcResource
@@ -315,19 +346,19 @@ public class AccessPointTest extends TestCase {
                 results.setClosest(result);
                 EasyMock.expect(replay.getClosest(wbRequest, results)).andReturn(result);
             }
-            
+
             // Note AccessPoint passes a copy of CaptureSearchResult in some case (ex. Replay_Revisit() test).
             // so we need to use custom argument matcher.
             EasyMock.expect(resourceStore.retrieveResource(eqCaptureSearchResult(result))).andReturn(res).anyTimes();
-            
+
             results.addSearchResult(result);
             --closestIndex;
         }
         EasyMock.expect(resourceIndex.query(wbRequest)).andReturn(results);
-        
+
         return results;
     }
-    
+
     // REFACTORING THOUGHTS: WaybackRequest.setReplayRequest() could take requestUrl and replayTimestamp
     // it is semantically more clear.
     /**
@@ -342,6 +373,50 @@ public class AccessPointTest extends TestCase {
         wbRequest.setReplayRequest();
         wbRequest.setRequestUrl(requestUrl);
         wbRequest.setReplayTimestamp(replayTimestamp);
+    }
+    /**
+     * Setup expectation that {@code capture} is rendered.
+     * <p>
+     * @param capture CaptureSearchResult to be rendered
+     * @param headersResource Resource from which HTTP headers are read (revisit)
+     * @param payloadResource Resource from which HTTP payload is read (revisited)
+     * @param results capture search results from which {@code capture} is picked
+     * @throws WaybackException
+     * @throws IOException
+     * @throws ServletException
+     */
+	protected void expectRendering(CaptureSearchResult capture,
+			Resource headersResource, Resource payloadResource,
+			CaptureSearchResults results) throws ServletException, IOException,
+			WaybackException {
+		EasyMock.expect(
+			replay.getRenderer(wbRequest, capture, headersResource,
+				payloadResource)).andReturn(replayRenderer);
+		replayRenderer.renderResource(httpRequest, httpResponse, wbRequest,
+			capture, headersResource, cut.getUriConverter(), results);
+    }
+	/**
+	 * Setup expectation that {@code handleReplay} redirects to {@code expectedRedirectURI}.
+	 * @param expectedRedirectURI
+	 */
+	protected void expectRedirect(String expectedRedirectURI) {
+        httpResponse.setHeader("Location", expectedRedirectURI);
+        httpResponse.setStatus(302);
+	}
+
+    /**
+     * setup expected call to {@link ResourceIndex#query(WaybackRequest)},
+     * returning empty {@link UrlSearchResults}.
+     * <p>This is sufficient for most cases, as AccessPoint is not concerned
+     * with UrlSearchResult, but simply passes it to query renderer.</p>
+     * <p>Note: set up {@link #wbRequest} before calling this method.</p>
+     * @throws Exception declared, but will never be thrown
+     */
+    protected void expectUrlIndexQuery() throws Exception {
+		UrlSearchResults results = new UrlSearchResults();
+		EasyMock.expect(resourceIndex.query(wbRequest)).andReturn(results);
+		query.renderUrlResults(httpRequest, httpResponse, wbRequest, results,
+			cut.getUriConverter());
     }
 
     /**
@@ -358,14 +433,14 @@ public class AccessPointTest extends TestCase {
      * </li>
      * this shall result in redirect (302) response to the URL with
      * closest capture date in date component.
-     * 
+     *
      * alternative path: {@link #testBounceToReplayPrefix()}
      * @throws Exception
      */
     public void testHandleRequest_Replay_1() throws Exception {
         // make sure wbRequesat.requestUrl, replayTimestamp are set up.
         setReplayRequest("http://www.example.com/", "20100601123456");
-        
+
 //        // TODO: originalUrl can be different from wbRequst.requestUrl, and it will be
 //        // reflected to redirect URL (worth testing).
 //        CaptureSearchResults results = createCaptureSearchResults(
@@ -379,7 +454,8 @@ public class AccessPointTest extends TestCase {
 //        closest.setCaptureTimestamp("20100601000000");
         // Resource below has originalUrl="http://test.example.com/", which is different from
         // wbRequest.requestUrl above. originalUrl shall be reflected to resultant redirect URL.
-        CaptureSearchResults results = setupCaptures(
+        @SuppressWarnings("unused")
+		CaptureSearchResults results = setupCaptures(
                 0,
                 createTestHtmlResource("20100601000000", "hogheogehoge\n".getBytes("UTF-8"))
                 );
@@ -396,22 +472,21 @@ public class AccessPointTest extends TestCase {
         //     ResourceNotAvailableException if it is),
         //   - then calls collection.resourceStore.retrieveResource(closest),
         //     which returns Resource above.
-        
+
         // when closest's timestamp is different from replay requests's timestamp, it redirects
         // to closest's timestamp.
-        httpResponse.setStatus(302);
-        httpResponse.setHeader("Location", "/web/20100601000000/http://test.example.com/");
-        
+        expectRedirect("/web/20100601000000/http://test.example.com/");
+
         EasyMock.replay(httpRequest, httpResponse, resourceIndex, resourceStore, replay);
-        
+
         cut.init();
         boolean r = cut.handleRequest(httpRequest, httpResponse);
-        
+
         EasyMock.verify(resourceIndex, resourceStore, replay);
-        
+
         assertTrue("handleRequest return value", r);
     }
-    
+
     /**
      * basic replay test part 2.
      * there's a capture whose capture date matches the request.
@@ -420,7 +495,7 @@ public class AccessPointTest extends TestCase {
     public void testHandleRequest_Replay_2() throws Exception {
         // make sure wbRequesat.requestUrl, replayTimestamp are set up.
         setReplayRequest("http://test.example.com/", "20100601000000");
-        
+
         // there's capture with timestamp exactly requested for.
         Resource payloadResource = createTestHtmlResource("20100601000000", "hogheogehoge\n".getBytes("UTF-8"));
         CaptureSearchResults results = setupCaptures(
@@ -428,26 +503,19 @@ public class AccessPointTest extends TestCase {
                 payloadResource
                 );
         CaptureSearchResult closest = results.getClosest();
-        
-        // when closest's timestamp == request's timestamp,
-        // it gets ReplayRenderer with replay.getRenderer(wbRequest, closest, httpHeaderResource, payloadResource),
-        // and calls renderResource() on it.
-        EasyMock.expect(replay.getRenderer(wbRequest, closest, payloadResource, payloadResource)).andReturn(replayRenderer);
-        // calls replayRenderer.renderResource(...)
-        replayRenderer.renderResource(httpRequest, httpResponse, wbRequest,
-                closest, payloadResource, payloadResource, cut.getUriConverter(),
-                results);
-        
+
+        expectRendering(closest, payloadResource, payloadResource, results);
+
         EasyMock.replay(httpRequest, httpResponse, resourceIndex, resourceStore, replay);
-        
+
         cut.init();
         boolean r = cut.handleRequest(httpRequest, httpResponse);
 
         EasyMock.verify(resourceIndex, resourceStore, replay);
-        
+
         assertTrue("handleRequest return value", r);
     }
-    
+
     /**
      * test CaptureSearchResult equality by file and offset.
      */
@@ -476,16 +544,59 @@ public class AccessPointTest extends TestCase {
             buffer.append(expected.getOffset());
             buffer.append(")");
         }
-        
+
     }
     public static CaptureSearchResult eqCaptureSearchResult(CaptureSearchResult expected) {
         EasyMock.reportMatcher(new CaptureSearchResultMatcher(expected));
         return null;
     }
-    
+
+    public static class CaptureSearchMatcher implements IArgumentMatcher {
+		private String url;
+		private String replayTimestamp;
+
+		public CaptureSearchMatcher(String url, String replayTimestamp) {
+			this.url = url;
+			this.replayTimestamp = replayTimestamp;
+		}
+
+		@Override
+		public boolean matches(Object actual) {
+			if (!(actual instanceof WaybackRequest))
+				return false;
+			WaybackRequest wbRequest = (WaybackRequest)actual;
+			String replayTimestamp = wbRequest.getReplayTimestamp();
+			String url = wbRequest.getRequestUrl();
+			if (url == null || replayTimestamp == null)
+				return false;
+			if (this.url == null || this.replayTimestamp == null)
+				return false;
+			// Only exact match is supported. i.e. http://example.com/ and
+			// http://example.com are different even though they typically
+			// get canonicalized into the same string.
+			// Also not checking if wbRequest is in fact a capture search
+			// request.
+			return this.url.equals(url) &&
+					this.replayTimestamp.equals(replayTimestamp);
+		}
+
+		@Override
+		public void appendTo(StringBuffer buffer) {
+			buffer.append("eqCaptureSearchRequest(");
+			buffer.append(url).append(",").append(replayTimestamp);
+			buffer.append(")");
+		}
+	}
+
+	public static WaybackRequest eqCaptureSearchRequest(String url,
+			String replayTimestamp) {
+		EasyMock.reportMatcher(new CaptureSearchMatcher(url, replayTimestamp));
+		return null;
+	}
+
     /**
-     * test of revisit. 
-     * closest capture is a revisit. 
+     * test of revisit.
+     * closest capture is a revisit.
      * @throws Exception
      */
     public void testHandleRequest_Replay_Revisit() throws Exception {
@@ -505,29 +616,96 @@ public class AccessPointTest extends TestCase {
         assertTrue(closest.getDuplicatePayloadFile() != null);
         assertTrue(closest.getDuplicatePayloadOffset() != null);
 
-        EasyMock.expect(replay.getRenderer(wbRequest, closest, headerResource, payloadResource)).andReturn(replayRenderer);
-        // calls replayRenderer.renderResource(...)
-        replayRenderer.renderResource(httpRequest, httpResponse, wbRequest,
-                closest, headerResource, payloadResource, cut.getUriConverter(),
-                results);
-        
+        expectRendering(closest, headerResource, payloadResource, results);
+
         EasyMock.replay(httpRequest, httpResponse, resourceIndex, resourceStore, replay);
-        
+
         cut.init();
         boolean r = cut.handleRequest(httpRequest, httpResponse);
 
         EasyMock.verify(resourceIndex, resourceStore, replay);
-        
+
         assertTrue("handleRequest return value", r);
 
         // TODO: failure case: closest.duplicatePayloadFile != null -> ResourceNotAvailableException
         // TODO: failure case: self-redirecting -> calls finxNextClosest() and fails if there's no more closest.
         // wbRequest.timestampSearchKey == true -> calls queryIndex() once again.
-        
+
     }
-    
+
+    public static Resource createSelfRedirectResource(String url, String timestamp) throws IOException {
+		assert !url.endsWith("/");
+		// typical redirect: http://example.com to http://example.com/
+		String location = url + "/";
+		TestWARCRecordInfo recinfo = new TestWARCRecordInfo(
+			TestWARCRecordInfo.buildHttpRedirectResponseBlock("301 Moved Permanently", location));
+		recinfo.setUrl(url);
+		recinfo.setCreate14DigitDateFromDT14(timestamp);
+        TestWARCReader ar = new TestWARCReader(recinfo);
+        WARCRecord rec = ar.get(0);
+        WarcResource resource = new WarcResource(rec, ar);
+        resource.parseHeaders();
+        return resource;
+    }
+
+	/**
+	 * {@code handleReplay()} is supposed to throw {@code ResourceNotAvailableException}
+	 * when it cannot find a replay-able capture for a request.
+	 * This is a test for one of such "capture not found" case: revisited record cannot
+	 * found in the capture search results, and only other non-revisit resource available
+	 * is a self-redirect. This is rather a corner case. handlReplay() shall throw
+	 * {@code ResourceNotAvailableException}.
+	 * @throws Exception
+	 */
+    public void testHandleRequest_MissingRevisitPayload() throws Exception {
+		setReplayRequest("http://example.com", "20140619004054");
+		// resource revisited, but missing in capture search result
+		Resource revisited = createSelfRedirectResource("http://example.com",
+			"20140619015411");
+        CaptureSearchResults results = setupCaptures(
+            0,
+            createSelfRedirectResource("http://example.com", "20140619004054"),
+            createTestRevisitResource("20140619016511", revisited, true)
+            );
+        CaptureSearchResult revisit = results.getResults().get(1);
+        revisit.flagDuplicateDigest(); // revisit, but original is not found.
+
+        // expectation:
+        // 1. first capture is skipped because it is self-redirect. selects the second.
+        // 2. second capture is a revisit, calls resourceIndex.query() for the revisited,
+        //    but original capture is not found in the result.
+        // 3. ResourceNotAvailableException is thrown
+        // 4. exception captured, skip to the next capture and finds none.
+        // 5. ResourceNotAvailableException is thrown out of handleReplay
+        // 6. ExceptionRenderer.renderException is called (in handleQuery)
+
+        // XXX setting these up manually feels very fragile - perhaps we need a
+        // test ResourceIndex + ReplayDispatcher.
+		EasyMock.expect(
+			resourceIndex.query(eqCaptureSearchRequest("http://example.com",
+				"20140619015411"))).andReturn(results);
+		EasyMock.expect(
+			replay.getClosest(
+				eqCaptureSearchRequest("http://example.com", "20140619015411"),
+				EasyMock.same(results))).andReturn(results.getResults().get(0));
+
+        // for this test, it is easier to test handleReplay, not handleQuery
+
+        EasyMock.replay(httpRequest, httpResponse, resourceIndex, resourceStore, replay);
+
+        cut.init();
+		try {
+			cut.handleReplay(wbRequest, httpRequest, httpResponse);
+			fail("handleReplay did not throw ResourceNotAvailableException");
+		} catch (ResourceNotAvailableException ex) {
+			// expected.
+		}
+
+        EasyMock.verify(resourceIndex, resourceStore, replay);
+    }
+
     /**
-     * old-style WARC revisit (no HTTP status line and header, 
+     * old-style WARC revisit (no HTTP status line and header,
      * Content-Length in WARC header is zero).
      * it shall replay HTTP status line, headers and content from previous matching capture.
      * @throws Exception
@@ -536,7 +714,7 @@ public class AccessPointTest extends TestCase {
         // TODO - it'd be better to define an interface in Resource class so that AccessPoint
         // needs not to have separate execution path for this. that's easier to test.
     }
-    
+
     /**
      * old-style ARC revisit (no mimetype, filename is '-')
      * @throws Exception
@@ -544,11 +722,11 @@ public class AccessPointTest extends TestCase {
     public void testHandleRequest_Replay_OldARCRevisit() throws Exception {
         // ditto - see TODO comment above.
     }
-    
+
     public static final Resource createTest502Resource() throws IOException {
         byte[] failPayload = "failed\n".getBytes("UTF-8");
         byte[] content = TestWARCRecordInfo.buildHttpResponseBlock("502 Bad Gateway", "text/plain", failPayload);
-  
+
         TestWARCRecordInfo recinfo = new TestWARCRecordInfo(content);
         TestWARCReader ar = new TestWARCReader(recinfo);
         WARCRecord rec = ar.get(0);
@@ -556,7 +734,7 @@ public class AccessPointTest extends TestCase {
         resource.parseHeaders();
         return resource;
     }
-    
+
     /**
      * if closest is not HTTP-success AND replaying embedded context (CSS, JavaScript, images, etc.),
      * use next closest with successful response, or for lower priority, a redirect, instead.
@@ -567,38 +745,37 @@ public class AccessPointTest extends TestCase {
         // request timestamp is different from 'previous' below. it makes handleRequest
         // return redirect. in this case, Resource for 'previous' will not be retrieved.
         setReplayRequest("http://test.example.com/style.css", "20100601000000");
-        // if closest is not HTTP-success, 
+        // if closest is not HTTP-success,
         // to have isAnyEmbeddedContext() return true - any of cSSContext, iMGContext, jSContext
         // frameWrapperContext, iFrameWrapperContext, objectEmbedContext has the same effect.
         wbRequest.setCSSContext(true);
         assertTrue(wbRequest.isAnyEmbeddedContext());
-        
+
         CaptureSearchResults results = setupCaptures(
                 1,
-                createTestHtmlResource("http://test.example.com/style.css", 
+                createTestHtmlResource("http://test.example.com/style.css",
                         "20100501000000", "hogheogehoge\n".getBytes("UTF-8")),
                 createTest502Resource()
                 );
         CaptureSearchResult closest = results.getClosest();
         assertTrue(closest.isHttpError());
-        
+
         // or wbRequest.setBestLatestReplayRequest();
         final String expectedRedirectURI = "/web/20100501000000cs_/http://test.example.com/style.css";
-        httpResponse.setHeader("Location", expectedRedirectURI);
-        httpResponse.setStatus(302);
+        expectRedirect(expectedRedirectURI);
         // TODO: extraHeaders expectations?
-        
+
         EasyMock.replay(httpRequest, httpResponse, resourceIndex, resourceStore, query, replay);
-        
+
         cut.init();
         boolean r = cut.handleRequest(httpRequest, httpResponse);
         // handleReplay throws BetterRequestException and handled inside handleRequest()
         // exception will not be thrown out of handleRequest().
-        
+
         EasyMock.verify(httpResponse, resourceIndex, resourceStore, query, replay);
         assertTrue("handleRequest return value", r);
     }
-    
+
     // REFACTORING THOUGHTS: WaybackRequet.setUrlCaptureQueryRequest() could take requestUrl and replayTimestamp.
     /**
      * create new WaybackRequest set up as capture query request for URL {@code requestUrl}, at time
@@ -612,17 +789,17 @@ public class AccessPointTest extends TestCase {
         wbRequest.setRequestUrl(requestUrl);
         wbRequest.setReplayTimestamp(replayTimestamp);
     }
-    
+
     // REFACTORING THOUGHTS: query rendering could be done in the same mechanism as replay rendering.
     // there's no particular reason CaptureSearchResults rendering and UrlSearchResults
     // rendering must be implemented in the same class. they share nothing.
-    // ReplayRenderer and QueryRenderer may be unified by passing UIResults instead of 
+    // ReplayRenderer and QueryRenderer may be unified by passing UIResults instead of
     // (CaptureSearchResult, Resource, CaptureSearchResults) for ReplayRenderer, and
     // (CaptureSearchResults / UrlSearchResults) for QueryRenderer.
     // this way, query.Renderer could be replaced by generic "variant dispatcher" class
     // that dispatches rendering to different JSPs depending on the type of output (HTML
     // or XML).
-    
+
     public void testHandleRequest_CaptureSearchResults() throws Exception {
         setCaptureQueryRequest("http://www.example.com/", "20100601123456");
 
@@ -644,21 +821,21 @@ public class AccessPointTest extends TestCase {
         //     QueryRenderer implementation?)
         // - calls query.renderCaptureResults(...)
         query.renderCaptureResults(httpRequest, httpResponse, wbRequest, results, cut.getUriConverter());
-        
+
         EasyMock.replay(httpRequest, httpResponse, resourceIndex, query);
-        
+
         cut.init();
         boolean r = cut.handleRequest(httpRequest, httpResponse);
-        
+
         EasyMock.verify(query);
-        
+
         // result shall have closest flag set (FIrefox proxy plugin expects this)
         assertTrue("closest flag", result.isClosest());
-        
+
         assertTrue("handleRequest return value", r);
-        
+
     }
-    
+
     // REFACTORING THOUGHTS: WaybackRequet.setUrlQueryRequest() could take requestUrl and replayTimestamp.
     /**
      * create new WaybackRequest set up as URL query request for URL {@code requestUrl}
@@ -673,7 +850,7 @@ public class AccessPointTest extends TestCase {
         wbRequest.setRequestUrl(requestUrl);
         wbRequest.setReplayTimestamp(replayTimestamp);
     }
-    
+
     public void testHandleRequest_UrlSearchResults() throws Exception {
         setUrlQueryRequest("http://www.example.com/", "20100601123456");
 
@@ -681,31 +858,17 @@ public class AccessPointTest extends TestCase {
         // forwards the request to QueryRenderer. so we leave it uninitialized here.
         UrlSearchResults results = new UrlSearchResults();
         EasyMock.expect(resourceIndex.query(wbRequest)).andReturn(results);
-        
+
         // EXPECTATION: AccessPoint.handleQuery() calls query.renderUrlResults().
         query.renderUrlResults(httpRequest, httpResponse, wbRequest, results, cut.getUriConverter());
-        
+
         EasyMock.replay(httpRequest, httpResponse, query, resourceIndex);
-        
+
         cut.init();
         boolean r = cut.handleRequest(httpRequest, httpResponse);
-        
+
         EasyMock.verify(query, resourceIndex);
         assertTrue("handleRequest return value", r);
-    }
-
-    /**
-     * setup expected call to {@link ResourceIndex#query(WaybackRequest)},
-     * returning empty {@link UrlSearchResults}.
-     * <p>This is sufficient for most cases, as AccessPoint is not concerned
-     * with UrlSearchResult, but simply passes it to query renderer.</p>
-     * <p>Note: set up {@link #wbRequest} before calling this method.</p>
-     * @throws Exception declared, but will never be thrown
-     */
-    protected void expectUrlIndexQuery() throws Exception {
-    	UrlSearchResults results = new UrlSearchResults();
-    	EasyMock.expect(resourceIndex.query(wbRequest)).andReturn(results);
-		query.renderUrlResults(httpRequest, httpResponse, wbRequest, results, cut.getUriConverter());
     }
 
     // tests for collapseTime parameter. for query requests (both capture and URL),
@@ -751,12 +914,15 @@ public class AccessPointTest extends TestCase {
 			throws Exception {
 		cut.setQueryCollapseTime(10);
 		// query parameters and CaptureSeachResults details are irrelevant to
-// this test.
-		setReplayRequest("http://www.example.com/", "20100601123456");
+		// this test.
+		setReplayRequest("http://test.example.com/", "20100601123456");
 		setupCaptures(
 			0,
 			createTestHtmlResource("20100601000000",
 				"hogheogehoge\n".getBytes("UTF-8")));
+
+		expectRedirect("/web/20100601000000/http://test.example.com/");
+
 		EasyMock.replay(httpRequest, httpResponse, query, resourceIndex,
 			resourceStore, replay);
 
@@ -778,7 +944,7 @@ public class AccessPointTest extends TestCase {
     public void testBounceToReplayPrefix() throws Exception {
         final String URL = "http://www.example.com/";
         final String TIMESTAMP = "20100601123456";
-        
+
         setReplayRequest(URL, TIMESTAMP);
 
         EasyMock.reset(httpRequest);
@@ -794,17 +960,17 @@ public class AccessPointTest extends TestCase {
 
         final String suffix = "/" + TIMESTAMP + "/" + URL;
         httpResponse.sendRedirect(replayPrefix + suffix);
-        
+
         EasyMock.replay(httpRequest, httpResponse);
-        
+
         cut.handleRequest(httpRequest, httpResponse);
 
     }
-    
+
     // TODO: the way AccessPoint is reused for rendering static resource looks inefficient.
-    // bounceToReplayPrefix and bounceToQueryPrefix are always configured in pair, and they 
+    // bounceToReplayPrefix and bounceToQueryPrefix are always configured in pair, and they
     // are set to true only for static resource AccessPoint.
-    
+
     /**
      * static AccessPoint - configured with
      * <ul>
@@ -829,7 +995,7 @@ public class AccessPointTest extends TestCase {
         // used by RequestMapper#getRequestPathPrefix(HttpServletRequest)
         // typical value found in ia-wayback-projects/projects/global-wayback/configs/local/wayback.properties
         // TODO: RequestMapper#getRequestContextPath(HttpServletRequest) assumes value of this
-        // attribute ends with "/". RequestMapper has constant declaration for 
+        // attribute ends with "/". RequestMapper has constant declaration for
         // "webapp-request-context-path-prefix", but it's private.
         EasyMock.expect(
                 httpRequest.getAttribute("webapp-request-context-path-prefix"))
@@ -837,13 +1003,13 @@ public class AccessPointTest extends TestCase {
         // override getRequestURI() behavior
         EasyMock.expect(httpRequest.getRequestURI()).andStubReturn("/static/aaa.css");
         EasyMock.expect(httpRequest.getRequestURL()).andStubReturn(new StringBuffer("/static/aaa.css"));
-        
+
         // reconfigure RequestParser to return null, which signifies that
         // there's no dynamic handler and the request shall be mapped to local static resource.
         // (AccessPoint#dispatchLocal(HttpServletRequest))
         EasyMock.reset(parser);
         EasyMock.expect(parser.parse(httpRequest, cut)).andReturn(null);
-        
+
         // AccessPoint#dispatchLocal() checks existence of the file if ServletContext#getRealPath()
         // returns non-null value for translated request path. have it skip the test by returning
         // null. otherwise dispatchLocal() will fail.
@@ -851,63 +1017,73 @@ public class AccessPointTest extends TestCase {
         EasyMock.expect(servletContext.getRealPath(EasyMock.<String> notNull()))
                 .andStubReturn(null);
         cut.setServletContext(servletContext);
-        
+
         // Expectation: AccessPoint#dispatchLocal() eventually calls RequestDispatcher#forward(...)
         requestDispatcher.forward(httpRequest, httpResponse);
 
         EasyMock.replay(httpRequest, parser, servletContext, requestDispatcher);
-        
+
         assertEquals("aaa.css", RequestMapper.getRequestContextPath(httpRequest));
-        
+
         // AccessPoint#dispatchLocal() returns immediately if serveStatis is false.
         cut.setServeStatic(true);
         cut.init();
         boolean r = cut.handleRequest(httpRequest, httpResponse);
-        
+
         EasyMock.verify(parser, requestDispatcher);
-        
+
         assertTrue("handleRequest return value", r);
-        
+
     }
-    
+
     // *** Memento Tests ***
-    
+
     // REFACTORING THOUGHTS: Memento annotations (adding response headers) could be implemented
     // as decorator of replay renderer. because of this possibility, I separated out tests for
     // memento headers here.
 
+    /**
+     * test of Memento-furnished response to URL-M (Memento).
+     * Memento Specification states that URL-M response
+     * <ul>
+     * <li>MUST NOT have "Vary: accept-datetime"</li>
+     * <li>MUST have "Memento-Datetime"</li>
+     * <li>MUST have "Link" header with at least a URI-R as "original" relation.</li>
+     * </ul>
+     * @throws Exception
+     */
     public void testMemento_replay_exactCapture() throws Exception {
         final String AGGREGATION_PREFIX = "http://web.archive.org";
-        
+
         cut.setEnableMemento(true);
         cut.setConfigs(new Properties());
         cut.getConfigs().setProperty(MementoUtils.AGGREGATION_PREFIX_CONFIG, AGGREGATION_PREFIX);
-        
+
         // make sure wbRequesat.requestUrl, replayTimestamp are set up.
         setReplayRequest("http://www.example.com/", "20100601000000");
         assertFalse(wbRequest.isMementoTimegate());
+
         Resource payloadResource = createTestHtmlResource("20100601000000", "hogehogehogehoge\n".getBytes("UTF-8"));
         CaptureSearchResults results = setupCaptures(
                 0,
                 payloadResource
                 );
         CaptureSearchResult closest = results.getClosest();
-        
+
         // when closest's timestamp == request's timestamp,
         // it gets ReplayRenderer with replay.getRenderer(wbRequest, closest, httpHeaderResource, payloadResource),
         // and calls renderResource() on it.
-        EasyMock.expect(replay.getRenderer(wbRequest, closest, payloadResource, payloadResource)).andReturn(replayRenderer);
-        // calls replayRenderer.renderResource(...)
-        replayRenderer.renderResource(httpRequest, httpResponse, wbRequest,
-                closest, payloadResource, payloadResource, cut.getUriConverter(),
-                results);
-        
+        expectRendering(closest, payloadResource, payloadResource, results);
+
         // key expectations of this test
         // called through MementoUtils.addMementoHeaders(...)
+        // NO Vary: accept-datetime header.
         final String expectedMementoDateTime = "Tue, 01 Jun 2010 00:00:00 GMT";
         httpResponse.setHeader(MementoUtils.MEMENTO_DATETIME, expectedMementoDateTime);
-        // MementoUtils.generateMementoLinkHeaders(...)
+        // Wayback include timemap, timegate, first and last memento links in addition to
+        // mandatory "original" link.
         // TODO: actually it is acceptable to have various rels in different order.
+        // It'd take custom argument matcher.
         final String expectedMementoLink = String.format(
                 "<%1$s>; rel=\"original\", " +
                 "<%2$s%3$stimemap/link/%1$s>; rel=\"timemap\"; type=\"application/link-format\", " +
@@ -915,88 +1091,143 @@ public class AccessPointTest extends TestCase {
                 "<%2$s%3$s%4$s/%1$s>; rel=\"first last memento\"; datetime=\"%5$s\"",
                 "http://www.example.com/", AGGREGATION_PREFIX, WEB_PREFIX, "20100601000000", expectedMementoDateTime);
         httpResponse.setHeader(MementoUtils.LINK, expectedMementoLink);
-        
+
         EasyMock.replay(httpRequest, httpResponse, resourceIndex, resourceStore, replay);
-        
+
         cut.init();
         boolean r = cut.handleRequest(httpRequest, httpResponse);
 
         EasyMock.verify(resourceIndex, resourceStore, replay);
-        
+
         assertTrue("handleRequest return value", r);
     }
 
+    /**
+     * Test of Memento-furnished response to replay request for non-archived timestamp.
+     * This is not strictly a URL-M (as far as I understand). Wayback returns <i>intermediate
+     * resource</i> to URI-M. Memento Specification states the response
+     * <ul>
+     * <li>MUST NOT have "Vary: accept-datetime" header (this is the key difference from
+     * redirect from URI-G; see below)</li>
+	 * <li>MUST NOT have "Memento-Datetime" header</li>
+	 * <li>MUST have "Link" header, which MUST have at least "original" relation link.
+	 * "timegate", "timemap" and "memento" relation type links MAY be provided.</li>
+	 * </ul>
+     * @throws Exception
+     */
     public void testMemento_replay_nearbyCapture() throws Exception {
         cut.setEnableMemento(true);
         // make sure wbRequesat.requestUrl, replayTimestamp are set up.
-        setReplayRequest("http://www.example.com/", "20100601123456");
+        // As this is a URI-M, not URI-G, mementoTimegate flag must be false.
+        setReplayRequest("http://test.example.com/", "20100601123456");
         assertFalse(wbRequest.isMementoTimegate());
-        
+
         Resource payloadResource = createTestHtmlResource("20100601000000", "hogehogehogehoge\n".getBytes("UTF-8"));
-        CaptureSearchResults results = setupCaptures(0, payloadResource);
+        @SuppressWarnings("unused")
+		CaptureSearchResults results = setupCaptures(0, payloadResource);
         // handleRequest()
         // calls handleReplay()
         // - calls checkInterstitialRedirect()
         // - calls selfRedirectCanonicalizer.urlStringToKey(requestURL) if non-null
         // - calls queryIndex(), which calls collection.resourceIndex.query(wbRequest)
-        
+
         // redirects to URL for closest capture.
-        // also has Link header.
+        expectRedirect("/web/20100601000000/http://test.example.com/");
+        // also has a Link header with just "original" relation.
         httpResponse.setHeader("Link", String.format("<%s>; rel=\"original\"", "http://test.example.com/"));
-        httpResponse.setStatus(302);
-        httpResponse.setHeader("Location", "/web/20100601000000/http://test.example.com/");
-        
+
         EasyMock.replay(httpRequest, httpResponse, resourceIndex, resourceStore, replay);
-        
+
         cut.init();
         boolean r = cut.handleRequest(httpRequest, httpResponse);
-        
+
         EasyMock.verify(httpResponse, resourceIndex, resourceStore, replay);
-        
+
         assertTrue("handleRequest return value", r);
     }
 
     /**
-     * Timemap == Memento rendering of capture query (CaptureSearchResult).
+	 * Test of Memento-furnished response to Timegate (URI-G).
+	 * Memento Specification states the response
+	 * <ul>
+	 * <li>MUST have "Vary: accept-datetime" header</li>
+     * <li>MUST NOT have "Memento-Datetime" header</li>
+     * <li>MUST have "Link" header, which MUST have at least "original" relation link.
+     * "timegate", "timemap" and "memento" relation type links MAY be provided.</li>
+     * </ul>
+	 * @throws Exception
+	 */
+	public void testMementoTimegate() throws Exception {
+		final String AGGREGATION_PREFIX = "http://web.archive.org";
+		cut.setEnableMemento(true);
+		cut.setConfigs(new Properties());
+		cut.getConfigs().setProperty(MementoUtils.AGGREGATION_PREFIX_CONFIG, AGGREGATION_PREFIX);
+
+		// Wayback Timegate is mapped to date-less replay URL (/web/<URI-R>) with
+		// Accept-Datetime header, but it is irrelevant here (it's a RequestParser
+		// matter.) What's relevant here is that WaybackRequest is a replay request
+		// with mementoTimegate property set to true.
+		setReplayRequest("http://test.example.com/", "20100601123456");
+		wbRequest.setMementoTimegate();
+
+		Resource payloadResource = createTestHtmlResource("20100601000000", "hogehogehogehoge\n".getBytes("UTF-8"));
+		@SuppressWarnings("unused")
+		CaptureSearchResults results = setupCaptures(0, payloadResource);
+
+		final String expectedMementoDateTime = "Tue, 01 Jun 2010 00:00:00 GMT";
+		// redirects to URL for closest capture.
+		expectRedirect("/web/20100601000000/http://test.example.com/");
+		// MUST have "Vary: accept-datetime" header
+		httpResponse.setHeader("Vary", "accept-datetime");
+		// also has Link header with mandatory "original" link, optional "timemap", and
+		// "first/last memento" (combined here) links. It can also include "prev/next memento" links,
+		// which is not applicable here.
+		final String expectedMementoLink = String.format(
+			"<%1$s>; rel=\"original\", " +
+			"<%2$s%3$stimemap/link/%1$s>; rel=\"timemap\"; type=\"application/link-format\", " +
+			"<%2$s%3$s%4$s/%1$s>; rel=\"first last memento\"; datetime=\"%5$s\"",
+			"http://test.example.com/", AGGREGATION_PREFIX, WEB_PREFIX, "20100601000000", expectedMementoDateTime);
+		httpResponse.setHeader(MementoUtils.LINK, expectedMementoLink);
+
+		EasyMock.replay(httpRequest, httpResponse, resourceIndex, resourceStore, replay);
+
+		cut.init();
+		boolean r = cut.handleRequest(httpRequest, httpResponse);
+
+		EasyMock.verify(httpResponse, resourceIndex, resourceStore, replay);
+
+		assertTrue("handleRequest return value", r);
+    }
+
+    /**
+     * test of Memento Timemap request.
+     * <p>Actual rendering is done by a separate bean implementing {@link MementoHandler}.
+     * So what we test here is that AccessPoint is correctly routing Timemap request to
+     * MementoHandler.
      */
     public void testMementoTimemap() throws Exception {
         cut.setEnableMemento(true);
         setCaptureQueryRequest("http://www.example.com/", "20100601000000");
-        wbRequest.setMementoTimegate();
-        
-        // handleRequest()
-        // redirect to queryPrefix + translateRequestPathQuery(httpRequest)
-        //   if bounceToQueryPrefix is true (not tested here)
-        // copies exactHostMatch to wbRequest.exactHost (TODO: should be done by parser?)
-        // calls handleQuery()
-        // - calls queryIndex(), which calls collection.resourceIndex.query(),
-        //     which returns CaptureSearchResults
-        //   (unexpected object from queryIndex() results in WaybackException("Unknown index format").
-        //    this is considered to be a programming/configuration error. not tested.)
-        CaptureSearchResults results = new CaptureSearchResults();
-        CaptureSearchResult result = new CaptureSearchResult();
-        results.setClosest(result);
-        EasyMock.expect(resourceIndex.query(wbRequest)).andReturn(results);
-        // - calls MementoUtils.printTimemapResponse(results, wbRequest, httpResponse) instead
-        //     if wbRequst.isMementoTimemapRequest() (N/A here) (TODO: can we move this to
-        //     QueryRenderer implementation?)
-        // - calls query.renderCaptureResults(...)
-        query.renderCaptureResults(httpRequest, httpResponse, wbRequest, results, cut.getUriConverter());
-        
-        EasyMock.replay(httpRequest, httpResponse, resourceIndex, query);
-        
+        // this make WaybackRequest.isMementoTimemapRequest() return true,
+        // which shall direct AccessPoint to call MementHandler.renderMementoTimemap().
+        wbRequest.setMementoTimemapFormat("link");
+
+        MementoHandler mementoHandler = EasyMock.createMock(MementoHandler.class);
+		EasyMock.expect(
+			mementoHandler.renderMementoTimemap(wbRequest, httpRequest,
+				httpResponse)).andReturn(true);
+		cut.setMementoHandler(mementoHandler);
+
+        EasyMock.replay(httpRequest, httpResponse, mementoHandler);
+
         cut.init();
         boolean r = cut.handleRequest(httpRequest, httpResponse);
-        
-        EasyMock.verify(query);
-        
-        // result shall have closest flag set (FIrefox proxy plugin expects this)
-        assertTrue("closest flag", result.isClosest());
-        
+
+        EasyMock.verify(mementoHandler);
+
         assertTrue("handleRequest return value", r);
-        
     }
-    
+
     /**
      * test for local static resource when enableMemento=true.
      * expectations:
@@ -1016,13 +1247,13 @@ public class AccessPointTest extends TestCase {
         EasyMock.expect(
                 httpRequest.getAttribute("webapp-request-context-path-prefix"))
                 .andStubReturn("/static/");
-        
+
         // reconfigure RequestParser to return null, which signifies that
         // there's no dynamic handler and the request shall be mapped to local static resource.
         // (AccessPoint#dispatchLocal(HttpServletRequest))
         EasyMock.reset(parser);
         EasyMock.expect(parser.parse(httpRequest, cut)).andReturn(null);
-        
+
         // AccessPoint#dispatchLocal() checks existence of the file if ServletContext#getRealPath()
         // returns non-null value for translated request path. have it skip the test by returning
         // null. otherwise dispatchLocal() will fail.
@@ -1030,23 +1261,23 @@ public class AccessPointTest extends TestCase {
         EasyMock.expect(servletContext.getRealPath(EasyMock.<String> notNull()))
                 .andStubReturn(null);
         cut.setServletContext(servletContext);
-        
+
         // Expectation: AccessPoint#dispatchLocal() eventually calls RequestDispatcher#forward(...)
         requestDispatcher.forward(httpRequest, httpResponse);
-        
+
         // key expectation in this test
         httpResponse.setHeader(MementoUtils.LINK, "<http://mementoweb.org/terms/donotnegotiate>; rel=\"type\"");
 
         EasyMock.replay(httpRequest, parser, servletContext, requestDispatcher);
-        
+
         cut.init();
-        
+
         boolean r = cut.handleRequest(httpRequest, httpResponse);
-        
+
         EasyMock.verify(parser, requestDispatcher);
 
         assertTrue("handleRequest return value", r);
-        
     }
-    
+
+    // TODO: tests of live-web redirector
 }
