@@ -2,6 +2,7 @@ package org.archive.wayback.webapp;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.logging.Logger;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;
@@ -10,47 +11,52 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpServletResponseWrapper;
 
 public class PerfWritingHttpServletResponse extends HttpServletResponseWrapper {
-	
+
 	protected Enum<?> perfStat;
 	protected String perfStatsHeader;
 	protected boolean hasWritten;
 	protected HttpServletResponse httpResponse;
-	
+
 	protected int expireTimeout = 60;
-	
+
 	protected String requestURI;
 	protected boolean perfCookie = false;
-	
-	public PerfWritingHttpServletResponse(HttpServletRequest request, HttpServletResponse response, Enum<?> stat, String perfStatsHeader)
-	{
+
+	public PerfWritingHttpServletResponse(HttpServletRequest request,
+			HttpServletResponse response, Enum<?> stat, String perfStatsHeader) {
 		super(response);
-		
+
 		this.httpResponse = response;
 		this.requestURI = request.getRequestURI();
 		this.perfStat = stat;
 		this.perfStatsHeader = perfStatsHeader;
 	}
-	
-	public void writePerfStats()
-	{
+
+	public void writePerfStats() {
 		if (hasWritten) {
 			return;
 		}
-		
+
 		long elapsed = PerfStats.timeEnd(perfStat);
-		
+
 		if (perfStatsHeader != null) {
 			httpResponse.setHeader(perfStatsHeader, PerfStats.getAllStats());
 		}
-		
+
 		if (requestURI != null) {
 			Cookie cookie = new Cookie("wb_total_perf", String.valueOf(elapsed));
 			cookie.setMaxAge(expireTimeout);
 			//cookie.setDomain(domainName);
 			cookie.setPath(requestURI);
-			httpResponse.addCookie(cookie);
+			try {
+				httpResponse.addCookie(cookie);
+			} catch (IllegalArgumentException ex) {
+				Logger logger = Logger.getLogger(getClass().getName());
+				logger.warning("addCookie failed for " + cookie + " (path=\"" +
+						requestURI + "\"): " + ex.getMessage());
+			}
 		}
-		
+
 		hasWritten = true;
 	}
 
@@ -88,6 +94,6 @@ public class PerfWritingHttpServletResponse extends HttpServletResponseWrapper {
 	 * @deprecated 1.8.1, no replacement. this method has no effect.
 	 */
 	public void enablePerfCookie() {
-		this.perfCookie  = true;
-    }
+		this.perfCookie = true;
+	}
 }
