@@ -61,12 +61,12 @@ public class FlatFileResourceFileLocationDB implements ResourceFileLocationDB  {
 				break;
 			}
 		}
-		
+
 		//if user has requested url without slash at end, check if any videos for url with slash at end
 		if (urls.size() == 0 && name.indexOf("?") == -1 && !name.endsWith("/")) {
-		
+
 			prefix = name + "/" + delimiter;
-			
+
 			itr = flatFile.getRecordIterator(prefix + "");
 
 			while(itr.hasNext()) {
@@ -78,7 +78,7 @@ public class FlatFileResourceFileLocationDB implements ResourceFileLocationDB  {
 				}
 			}
 		}
-		
+
 		if(itr instanceof CloseableIterator) {
 			CloseableIterator<String> citr = (CloseableIterator<String>) itr;
 			citr.close();
