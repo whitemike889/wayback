@@ -160,7 +160,6 @@ public class ReplayParseContext extends ParseContext {
 	 * returns {@link ResultURIConverter} for resource context <code>flags</code>.
 	 * @param flags resource context indicator such as "{@code cs_}", "{@code im_}".
 	 * @return ResultURIConverter for translating URL
-	 * @see org.archive.wayback.archivalurl.ArchivalUrlSpecialContextReusltURIConverter
 	 */
 	public ResultURIConverter getConverter(String flags) {
 		// TODO: caching should be a responsibility of ContextResultURIConverterFactory.
@@ -173,9 +172,17 @@ public class ReplayParseContext extends ParseContext {
 		return converter;
 	}
 	
+        /**
+	 * Rewrite URL {@code url} in accordance with current replay mode, not using
+	 * replay context {@code flags}.
+	 * @param url URL, candidate for rewrite. may contain escaping. must not be {@code null}.
+	 * @return rewrittenURL, or {@code url} if no rewrite is necessary. never {@code null}.
+	 */
+        @Override
 	public String contextualizeUrl(String url) {
 		return contextualizeUrl(url,"");
 	}
+        
 	/**
 	 * Rewrite URL {@code url} in accordance with current replay mode, taking
 	 * replay context {@code flags} into account.

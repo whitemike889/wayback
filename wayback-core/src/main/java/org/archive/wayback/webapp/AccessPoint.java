@@ -966,8 +966,8 @@ implements ShutdownListener {
 
 	/**
 	 * If closest
+	 * @param currRequest
 	 * @param revisitRecord
-	 * @param captureResults
 	 * @param closest
 	 * @return the payload resource
 	 * @throws ResourceNotAvailableException
@@ -1150,6 +1150,7 @@ implements ShutdownListener {
 	 * Release any resources associated with this AccessPoint, including
 	 * stopping any background processing threads
 	 */
+        @Override
 	public void shutdown() {
 		if (collection != null) {
 			try {
@@ -1292,8 +1293,8 @@ implements ShutdownListener {
 	}
 
 	/**
-	 * @param liveWebPrefix the String URL prefix to use to attempt to retrieve
-	 * documents missing from the collection from the live web, on demand.
+         * @param liveWebRedirector Set the {@link LiveWebRedirector} to use to try and retrieve documents 
+         * from the live web on demand when missing from the collection.
 	 */
 	public void setLiveWebRedirector(LiveWebRedirector liveWebRedirector) {
 		this.liveWebRedirector = liveWebRedirector;
@@ -1738,7 +1739,7 @@ implements ShutdownListener {
 
 	/**
 	 * URL canonicalizer for testing self-redirect.
-	 * @return UrlCanonicalizer
+	 * @return The {@link UrlCanonicalizer}
 	 */
 	public UrlCanonicalizer getSelfRedirectCanonicalizer() {
 		return this.selfRedirectCanonicalizer;

@@ -52,11 +52,11 @@ public class StringFormatter {
 	 * Construct a StringFormatter...
 	 * @param bundle ResourceBundle to lookup patterns for MessageFormat 
 	 * objects.
-	 * @param locale to use, where applicable with MessageFormat objects
 	 */
 	public StringFormatter(ResourceBundle bundle) {
 		this(null, Locale.getDefault());
 	}
+        
 	/**
 	 * Construct a StringFormatter...
 	 * @param bundle ResourceBundle to lookup patterns for MessageFormat 

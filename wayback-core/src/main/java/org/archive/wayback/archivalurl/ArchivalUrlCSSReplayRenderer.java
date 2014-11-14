@@ -75,7 +75,8 @@ public class ArchivalUrlCSSReplayRenderer extends TextReplayRenderer {
 
 		page.resolveCSSUrls();
 		// if any CSS-specific jsp inserts are configured, run and insert...
-		page.insertAtStartOfDocument(buildInsertText(page, httpRequest,
+//		page.insertAtStartOfDocument(toInsert.toString());
+		page.insertAtEndOfDocument(buildInsertText(page, httpRequest,
 				httpResponse, wbRequest, results, result, resource));
 	}
 }

@@ -52,9 +52,8 @@ public abstract class CharsetDetector {
 	/**
 	 * @param httpHeadersResource resource with http headers to consider 
 	 * @param payloadResource resource with payload to consider (presumably text)
-	 * @param request WaybackRequest which may contain additional hints to
-	 *        processing
-	 * @return String charset name for the Resource, must not be {@code nul}
+	 * @param wbRequest WaybackRequest which may contain additional hints to processing
+	 * @return String charset name for the Resource
 	 * @throws IOException if there are problems reading the Resource
 	 */
 	public abstract String getCharset(Resource httpHeadersResource,

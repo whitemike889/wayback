@@ -4,6 +4,7 @@
 package org.archive.wayback.resourcestore.resourcefile;
 
 import java.text.SimpleDateFormat;
+import java.util.Locale;
 import java.util.Map;
 
 import junit.framework.TestCase;
@@ -175,7 +176,7 @@ public class WarcResourceTest extends TestCase {
         // must have Date header, in HTTP Date format.
         String date = res.getHeader("Date");
         assertNotNull("has date header", date);
-        new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z").parse(date);
+        new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).parse(date);
         
         // block as content
         byte[] buf = new byte[block.length + 1];
@@ -302,7 +303,7 @@ public class WarcResourceTest extends TestCase {
         // must have Date header, in HTTP Date format.
         String date = res.getHeader("Date");
         assertNotNull("has date header", date);
-        new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z").parse(date);
+        new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).parse(date);
         
         res.close();
     }
