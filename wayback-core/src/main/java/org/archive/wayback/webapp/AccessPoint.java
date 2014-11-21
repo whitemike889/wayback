@@ -151,6 +151,8 @@ public class AccessPoint extends AbstractRequestHandler implements
 	private boolean enableWarcFileHeader = false;
 	private boolean enableMemento = true;
 
+	private PerfStats.OutputFormat perfStatsHeaderFormat = PerfStats.OutputFormat.BRACKET;
+
 	private LiveWebRedirector liveWebRedirector;
 
 	private String staticPrefix = null;
@@ -260,7 +262,9 @@ public class AccessPoint extends AbstractRequestHandler implements
 
 			if (this.isEnablePerfStatsHeader() && (perfStatsHeader != null)) {
 				PerfStats.timeStart(PerfStat.Total);
-				httpResponse = new PerfWritingHttpServletResponse(httpRequest, httpResponse, PerfStat.Total, perfStatsHeader);
+				httpResponse = new PerfWritingHttpServletResponse(httpRequest,
+					httpResponse, PerfStat.Total, perfStatsHeader,
+					perfStatsHeaderFormat);
 			}
 
 			String inputPath = translateRequestPathQuery(httpRequest);
@@ -1871,5 +1875,15 @@ public class AccessPoint extends AbstractRequestHandler implements
 
 	public void setMementoHandler(MementoHandler mementoHandler) {
 		this.mementoHandler = mementoHandler;
+	}
+
+	/**
+	 * Format of profiling header field.
+	 * @param perfStatsHeaderFormat
+	 * @see PerfStats.OutputFormat
+	 */
+	public void setPerfStatsHeaderFormat(
+			PerfStats.OutputFormat perfStatsHeaderFormat) {
+		this.perfStatsHeaderFormat = perfStatsHeaderFormat;
 	}
 }
