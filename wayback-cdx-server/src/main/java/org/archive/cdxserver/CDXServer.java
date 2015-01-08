@@ -240,8 +240,7 @@ public class CDXServer extends BaseCDXServer {
 //				}
 //			}
 
-			String startEndUrl[] = urlSurtRangeComputer.determineRange(
-					query.url, query.matchType, "", "");
+			String startEndUrl[] = determineRange(query.url, query.matchType, "", "");
 
 			if (startEndUrl == null) {
 				responseWriter.printError("Sorry, matchType=" +
