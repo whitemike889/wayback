@@ -367,6 +367,32 @@ public class UrlOperations {
 		}
 		return url;
 	}
+	
+	/**
+	 * Attempt to determine if an absolute url has a hostname component.
+	 * @param url the url String from which to determine if a hostname exists
+	 * @return true if hostname within the URL, or false if the host 
+	 * cannot be found.
+	 */
+	public static boolean hasHost(String url) {
+		String lcUrl = url.toLowerCase();
+		if(lcUrl.startsWith(DNS_SCHEME)) {
+			return true;
+		}
+		for(String scheme : ALL_SCHEMES) {
+			if(lcUrl.startsWith(scheme)) {
+				int authorityIdx = scheme.length();
+
+				Matcher m = 
+					HOST_REGEX_SIMPLE.matcher(lcUrl.substring(authorityIdx));
+				if(m.find()) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
 
 	/**
 	 * Extract userinfo from the absolute URL argument, that is, "username@", or
