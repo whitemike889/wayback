@@ -93,12 +93,15 @@ public class ServerRelativeArchivalRedirect extends AbstractRequestHandler {
 		if (!collection.isEmpty() && collection.length() > 1 &&
 				!Character.isDigit(collection.charAt(1))) {
 			
-			for (Cookie cookie: httpRequest.getCookies()) {
-				if ("wayback.collectionid".equals(cookie.getName())) {
-					collection = "/" + cookie.getValue();
-					break;
+			if (httpRequest.getCookies() != null) {
+				for (Cookie cookie: httpRequest.getCookies()) {
+					if ("wayback.collectionid".equals(cookie.getName())) {
+						collection = "/" + cookie.getValue();
+						break;
+					}
 				}
 			}
+			
 		}
 		
 		String remainder = path.substring(secondSlash + 1);
@@ -111,29 +114,32 @@ public class ServerRelativeArchivalRedirect extends AbstractRequestHandler {
 			
 			datespec = null;
 			
-			for (Cookie cookie: httpRequest.getCookies()) {
-				if ("wayback.timestamp".equals(cookie.getName())) {
-					datespec = cookie.getValue();
-					break;
+			if (httpRequest.getCookies() != null) {
+				for (Cookie cookie: httpRequest.getCookies()) {
+					if ("wayback.timestamp".equals(cookie.getName())) {
+						datespec = cookie.getValue();
+						break;
+					}
 				}
+				
 			}
 		}
 
 		String url = remainder.substring(thirdSlash + 1);
+
+		boolean urlHasBeenFixed = false;
 		
-		if (UrlOperations.hasHost(url)) {
-			url = UrlOperations.fixupScheme(url);
-			url = ArchiveUtils.addImpliedHttpIfNecessary(url);
-		} else {
+		if (httpRequest.getCookies() != null) {
 			for (Cookie cookie : httpRequest.getCookies()) {
 				if ("wayback.archivalhost".equals(cookie.getName())) {
 					url = URLDecoder.decode(cookie.getValue(), "UTF-8");
+					urlHasBeenFixed = true;
 					break;
 				}
 			}
 		}
 
-		if (url == null) {
+		if (!urlHasBeenFixed) {
 			url = UrlOperations.fixupScheme(url);
 			url = ArchiveUtils.addImpliedHttpIfNecessary(url);
 		}
