@@ -89,7 +89,8 @@ public class ServerRelativeArchivalRedirect extends AbstractRequestHandler {
 		
 		String collection = path.substring(0, secondSlash);
 		collection = modifyCollection(collection); 
-		
+
+		//determine if collection is not numeric. if not numeric, get the collection from the cookie (if it exists)
 		if (!collection.isEmpty() && collection.length() > 1 &&
 				!Character.isDigit(collection.charAt(1))) {
 			
