@@ -225,6 +225,7 @@ public class FlexResourceStore implements ResourceStore {
 					breakOnErr = true;
 					break;
 				}
+				continue;
 			}
 			
 			if (paths.length == 0) {
