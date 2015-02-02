@@ -139,6 +139,8 @@ public class ServerRelativeArchivalRedirect extends AbstractRequestHandler {
 			// !! collection has leading '/'. It's bad, but existing
 			// sub-class may break if we change it.
 			collection = modifyCollection(path.substring(0, colSlash));
+			
+			if (!Character.isDigit(collection.charAt(1))) return null;
 			path = path.substring(colSlash + 1);
 		} else {
 			// next line expects path does not start with "/"
@@ -154,12 +156,20 @@ public class ServerRelativeArchivalRedirect extends AbstractRequestHandler {
 			datespec = null;
 		}
 
+		String thisPath = httpRequest.getRequestURI();
+		String queryString = httpRequest.getQueryString();
+		if (queryString != null) {
+		    thisPath += "?" + queryString;
+		}
+		
 		String url = path.substring(tsSlash + 1);
 		url = UrlOperations.fixupScheme(url);
 		url = ArchiveUtils.addImpliedHttpIfNecessary(url);
+		
+		String resolved = UrlOperations.resolveUrl(url, thisPath);
 
 		final String root = refuri.getScheme() + "://" + authority;
-		return new ArchivalUrlRef(root, collection, datespec, url);
+		return new ArchivalUrlRef(root, collection, datespec, resolved);
 	}
 
 	private String handleRequestWithCollection(HttpServletRequest httpRequest,
