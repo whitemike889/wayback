@@ -26,10 +26,10 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import org.apache.commons.httpclient.URIException;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.archive.url.UsableURI;
 import org.archive.url.UsableURIFactory;
 import org.archive.wayback.core.CaptureSearchResult;
+import org.archive.wayback.util.url.UrlOperations;
 /**
  * Class which tracks the context and state involved with parsing an HTML
  * document via SAX events.
@@ -50,6 +50,7 @@ public class ParseContext {
 
 	protected UsableURI baseUrl = null;
 
+	private boolean inHTML = false;
 	private boolean inCSS = false;
 	private boolean inJS = false;
 	private boolean inScriptText = false;
@@ -84,16 +85,26 @@ public class ParseContext {
 	public Map<String,String> getMap() {
 		return data;
 	}
+
+	/**
+	 * @param baseURL an base URL for relative URLs
+	 */
+	public void setBaseUrl(String baseURL) {
+		try {
+			baseUrl = UsableURIFactory.getInstance(baseURL);
+		} catch (URIException ex) {
+			// XXX
+			ex.printStackTrace();
+		}
+	}
+
 	/**
 	 * @param url against which relative URLs should be resolved for this parse
 	 */
 	public void setBaseUrl(URL url) {
-		try {
-			baseUrl = UsableURIFactory.getInstance(url.toExternalForm());
-		} catch (URIException e) {
-			e.printStackTrace();
-		}
+		setBaseUrl(url.toExternalForm());
 	}
+
 	/**
 	 * Resolve possibly-relative {@code url} with {@code baseUrl} set to
 	 * this object. 
@@ -104,6 +115,9 @@ public class ParseContext {
 	 * @throws URISyntaxException if the input URL is malformed
 	 */
 	public String resolve(String url) throws URISyntaxException {
+		if (url.startsWith(UrlOperations.JAVASCRIPT_PREFIX))
+			return url;
+
 		int hashIdx = url.indexOf('#');
 		String frag = "";
 		if (hashIdx != -1) {
@@ -131,7 +145,7 @@ public class ParseContext {
 	 * @return absolute form of input url, or url itself if javascript:
 	 */
 	public String contextualizeUrl(String url) {
-	    if(url.startsWith("javascript:")) {
+	    if(url.startsWith("javascript:") || url.startsWith("#")) {
 	    	return url;
 	    }
 		try {
@@ -140,6 +154,20 @@ public class ParseContext {
 			e.printStackTrace();
 			return url;
 		}
+	}
+
+	/**
+	 * set to {@code true} when any HTML open tag
+	 * is found.
+	 * <p>used for checking if the content really
+	 * looks like an HTML document.</p>
+	 * @param inHTML
+	 */
+	public void setInHTML(boolean inHTML) {
+		this.inHTML = inHTML;
+	}
+	public boolean isInHTML() {
+		return inHTML;
 	}
 
 	/**

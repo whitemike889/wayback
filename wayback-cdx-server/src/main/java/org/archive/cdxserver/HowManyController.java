@@ -13,6 +13,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.archive.cdxserver.auth.AuthToken;
 import org.archive.cdxserver.filter.CDXAccessFilter;
 import org.archive.format.gzip.zipnum.ZipNumCluster;
+import org.archive.url.HandyURL;
+import org.archive.url.URLParser;
 import org.archive.url.UrlSurtRangeComputer.MatchType;
 import org.archive.util.ArchiveUtils;
 import org.archive.util.binsearch.SortedTextFile.CachedStringIterator;
@@ -196,10 +198,17 @@ public class HowManyController extends BaseCDXServer {
 				accessChecker = authChecker.createAccessFilter(authToken);
 			}
             
-            String[] startEnd = urlSurtRangeComputer.determineRange(url, matchType, from, to);
+            String[] startEnd = determineRange(url, matchType, from, to);
             start = startEnd[0];
             end = startEnd[1];
-            host = startEnd[2];
+
+            // as determineRange does not return the host as third element,
+            // compute by running canonicalization once again.
+            // TODO: host is never used by this method; it is simply returned
+            // in response. do we really need it?
+            HandyURL hURL = URLParser.parse(url);
+            keyMaker.getCanonicalizer().canonicalize(hURL);
+            host = hURL.getHost();
             
             if (accessChecker != null && !accessChecker.includeUrl(start, url)) {
                 restricted = true;

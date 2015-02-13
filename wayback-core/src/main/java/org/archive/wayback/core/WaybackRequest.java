@@ -47,7 +47,6 @@ import org.archive.wayback.webapp.AccessPoint;
  * Machine.
  * 
  * @author Brad Tofel
- * @version $Date$, $Revision$
  */
 public class WaybackRequest {
 
@@ -95,6 +94,7 @@ public class WaybackRequest {
 	 * StringFormatter object set up with the users specific Locale, and the
 	 * Wayback UI ResourceBundle prepared for use, simplifying UI generation
 	 * somewhat.
+	 * @deprecated 2014-05-06 moved to UIResults
 	 */
 	private StringFormatter formatter = null;
 	/**
@@ -102,6 +102,7 @@ public class WaybackRequest {
 	 * information. See constants below for keys & values.
 	 */
 	private HashMap<String,String> filters = new HashMap<String,String>();
+	private Locale locale;
 	
 
 	/*
@@ -424,13 +425,6 @@ public class WaybackRequest {
 	 * hour resolution (TimeLine mode)
 	 */
 	public static final String REQUEST_RESOLUTION_HOURS = "hours";
-	/*
-	 * ***********************
-	 * /TIMELINE MODE CONSTANTS 
-	 * ***********************
-	 */
-	
-	private static String UI_RESOURCE_BUNDLE_NAME = "WaybackUI";
 
 	private static String STD_LOGGED_IN_VER = "logged-in-ver";
 	private static String STD_LOGGED_IN_NAME = "logged-in-name";
@@ -457,6 +451,59 @@ public class WaybackRequest {
 			STD_LOGGED_IN_NAME,
 			STD_PHP_SESSION_ID,
 			STD_J_SESSION_ID };
+
+	// static constructor methods for typical cases
+
+	/**
+	 * create WaybackRequet for URL-Query request.
+	 * @param url target URL
+	 * @param start start timestamp (14-digit)
+	 * @param end end timestamp (14-digit)
+	 * @return WaybackRequest
+	 */
+	public static WaybackRequest createUrlQueryRequest(String url, String start, String end) {
+		WaybackRequest r = new WaybackRequest();
+		r.setUrlQueryRequest();
+		r.setRequestUrl(url);
+		r.setStartTimestamp(start);
+		r.setEndTimestamp(end);
+		return r;
+	}
+
+	/**
+	 * create WaybackRequest for Capture-Query request.
+	 * @param url target URL
+	 * @param replay highlight date
+	 * @param start start timestamp (14-digit)
+	 * @param end end timestamp (14-digit)
+	 * @return WaybackRequest
+	 */
+	public static WaybackRequest createCaptureQueryRequet(String url, String replay, String start, String end) {
+		WaybackRequest r = new WaybackRequest();
+		r.setCaptureQueryRequest();
+		r.setRequestUrl(url);
+		r.setReplayTimestamp(replay);
+		r.setStartTimestamp(start);
+		r.setEndTimestamp(end);
+		return r;
+	}
+	/**
+	 * create WaybackRequet for Replay request.
+	 * @param url target URL
+	 * @param replay requested date
+	 * @param start start timestamp (14-digit)
+	 * @param end end timestamp (14-digit)
+	 * @return WaybackRequet
+	 */
+	public static WaybackRequest createReplayRequest(String url, String replay, String start, String end) {
+		WaybackRequest r = new WaybackRequest();
+		r.setReplayRequest();
+		r.setRequestUrl(url);
+		r.setReplayTimestamp(replay);
+		r.setStartTimestamp(start);
+		r.setEndTimestamp(end);
+		return r;
+	}
 
 	/**
 	 * @return Returns the resultsPerPage.
@@ -490,8 +537,8 @@ public class WaybackRequest {
 
 	/**
 	 * @param prefix
-	 * @deprecated use getAccessPoint.getStaticPrefix() or
-	 * getAccessPoint.getReplayPrefix()
+	 * @deprecated use getAccessPoint.setStaticPrefix() or
+	 * getAccessPoint.setReplayPrefix()
 	 */
 	public void setContextPrefix(String prefix) {
 		contextPrefix = prefix;
@@ -503,7 +550,7 @@ public class WaybackRequest {
 	 * 
 	 * @return String absolute URL pointing to the Context root where the
 	 *         request was received.
-	 * @deprecated use AccessPoint.setReplayPrefix or setQueryPrefix
+	 * @deprecated use AccessPoint.getReplayPrefix or getQueryPrefix
 	 */
 	public String getContextPrefix() {
 		if(accessPoint == null) {
@@ -568,12 +615,26 @@ public class WaybackRequest {
 	
 	/**
 	 * @return StringFormatter based on user request info
+	 * @deprecated 1.8.1 use {@link UIResults#getFormatter()}.
 	 */
 	public StringFormatter getFormatter() {
-		if(formatter == null) {
-			setLocale(Locale.getAvailableLocales()[0]);
+		if (formatter == null) {
+			Locale l = locale;
+			if (l == null) {
+				l = Locale.getAvailableLocales()[0];
+			}
+			ResourceBundle b = ResourceBundle.getBundle(UIResults.UI_RESOURCE_BUNDLE_NAME);
+			formatter = new StringFormatter(b, l);
 		}
 		return formatter;
+	}
+	/**
+	 * return locale for this request.
+	 * @return {@code Locale}
+	 * @version 1.8.1
+	 */
+	public Locale getLocale() {
+		return locale;
 	}
 
 	/**
@@ -815,6 +876,7 @@ public class WaybackRequest {
 
 	public void setJSContext(boolean isJSContext) {
 		setBoolean(REQUEST_JS_CONTEXT,isJSContext);
+		setForcedContentType(isJSContext ? "text/javascript" : null);
 	}
 	public boolean isJSContext() {
 		return getBoolean(REQUEST_JS_CONTEXT);
@@ -822,6 +884,7 @@ public class WaybackRequest {
 
 	public void setCSSContext(boolean isCSSContext) {
 		setBoolean(REQUEST_CSS_CONTEXT,isCSSContext);
+		setForcedContentType(isCSSContext ? "text/css" : null);
 	}
 	public boolean isCSSContext() {
 		return getBoolean(REQUEST_CSS_CONTEXT);
@@ -829,6 +892,9 @@ public class WaybackRequest {
 	
 	public void setIMGContext(boolean isIMGContext) {
 		setBoolean(REQUEST_IMAGE_CONTEXT,isIMGContext);
+		// not setting foredContentType because 1) subtype is
+		// unknown. 2) catch-all transparent ReplayRenderer
+		// is used for im_ anyways.
 	}
 	public boolean isIMGContext() {
 		return getBoolean(REQUEST_IMAGE_CONTEXT);
@@ -862,6 +928,22 @@ public class WaybackRequest {
 		return getBoolean(REQUEST_IFRAME_WRAPPER_CONTEXT);
 	}
 	
+	// TODO: this could be a native field.
+	private static final String REQUEST_FORCED_CONTENT_TYPE = "forced.content.type";
+
+	/**
+	 * set content type forced by context flag (ex. {@code cs_}).
+	 * If this is set, it overrides contentType from index/resource.
+	 * @param contentType content type (ex. {@code text/css}) or {@code null}.
+	 * @see org.archive.wayback.replay.selector.MimeTypeSelector
+	 */
+	public void setForcedContentType(String contentType) {
+		put(REQUEST_FORCED_CONTENT_TYPE, contentType);
+	}
+	public String getForcedContentType() {
+		return get(REQUEST_FORCED_CONTENT_TYPE);
+	}
+
 	public boolean isAnyEmbeddedContext()
 	{
 		return this.isCSSContext() || this.isIMGContext() || this.isJSContext() ||
@@ -875,6 +957,18 @@ public class WaybackRequest {
 		return getBoolean(REQUEST_AJAX_REQUEST);
 	}
 	
+	/**
+	 * checks if Memento response is enabled in the {@link AccessPoint}
+	 * for this request.
+	 * <p>Better than accessing {@link AccessPoint#isEnableMemento()} through
+	 * {@link #getAccessPoint()}.</p>
+	 * @return {@code true} if enabled.
+	 * @see AccessPoint#isEnableMemento()
+	 */
+	public boolean isMementoEnabled() {
+		return accessPoint != null && accessPoint.isEnableMemento();
+	}
+
 	public void setMementoTimemapFormat(String format) {
 		put(REQUEST_MEMENTO_TIMEMAP, format);
 	}
@@ -975,11 +1069,14 @@ public class WaybackRequest {
 	
 	/**
 	 * Set the Locale for the request, which impacts UI Strings
+	 * <p>2014-05-06 no longer initializes {@code StringFormatter}.</p>
 	 * @param l
+	 * @see UIResults
 	 */
-	public void setLocale(Locale l) {
-		ResourceBundle b = ResourceBundle.getBundle(UI_RESOURCE_BUNDLE_NAME,l);
-		formatter = new StringFormatter(b,l);
+	public void setLocale(Locale locale) {
+		this.locale = locale;
+//		ResourceBundle b = ResourceBundle.getBundle(UI_RESOURCE_BUNDLE_NAME,l);
+//		formatter = new StringFormatter(b,l);
 	}
 	
 	/**
@@ -1009,7 +1106,7 @@ public class WaybackRequest {
 			this.setAjaxRequest(true);
 		}
 		
-		if (accessPoint != null && accessPoint.isEnableMemento()) {		
+		if (isMementoEnabled()) {
 			// Check for Memento Accept-Datetime
 			String acceptDateTime = httpRequest.getHeader(MementoUtils.ACCEPT_DATETIME);
 			if (acceptDateTime != null) {
@@ -1028,13 +1125,15 @@ public class WaybackRequest {
 		putUnlessNull(REQUEST_WAYBACK_CONTEXT, httpRequest.getContextPath());
 
 		Locale l = null;
-		if(accessPoint != null) {
+		if (accessPoint != null) {
 			l = accessPoint.getLocale();
 		}
-		if(l == null) {
+		if (l == null) {
 			l = httpRequest.getLocale();
 		}
-		setLocale(l);
+		//setLocale(l);
+		this.locale = l;
+
 		putUnlessNull(REQUEST_LOCALE_LANG,l.getDisplayLanguage());
 
 		Cookie[] cookies = httpRequest.getCookies();
@@ -1084,8 +1183,8 @@ public class WaybackRequest {
 				if (queryString.length() > 0) {
 					queryString.append(" ");
 				}
-                                key = URLEncoder.encode(key,"UTF-8");
-                                val = URLEncoder.encode(val,"UTF-8");
+				key = URLEncoder.encode(key, "UTF-8");
+				val = URLEncoder.encode(val, "UTF-8");
 				queryString.append(key + ":" + val);
 			}
 			String escapedQuery = queryString.toString();
@@ -1142,4 +1241,33 @@ public class WaybackRequest {
 	public void setBestLatestReplayRequest() {
 		this.setBoolean(REQUEST_LATEST_BEST_REPLAY, true);
 	}
+
+	// CDX query parameters - need to stuff this into WaybackRequest
+	// because ResourceIndex.query method takes nothing but WaybackRequest.
+	// Calls for redesign.
+
+	/**
+	 * for passing {@code collapseTime} parameter to {@code CDXServer}.
+	 * (it'd be ideal to change {@code ResourceIndex} interface.)
+	 */
+	private static final String CDXQUERY_COLLAPSE_TIME = "collapse.time";
+
+	/**
+	 * {@code collapseTime} parameter for {@code CDXServer}.
+	 * @return integer, {@code -1} if parameter is unspecified.
+	 */
+	public int getCollapseTime() {
+		return getInt(CDXQUERY_COLLAPSE_TIME);
+	}
+	/**
+	 * {@code collapseTime} parameter for {@code CDXServer}.
+	 * @param collapseTime integer, negative value for <i>unspecified</i>.
+	 */
+	public void setCollapseTime(int collapseTime) {
+		if (collapseTime < 0)
+			remove(CDXQUERY_COLLAPSE_TIME);
+		else
+			setInt(CDXQUERY_COLLAPSE_TIME, collapseTime);
+	}
+
 }
