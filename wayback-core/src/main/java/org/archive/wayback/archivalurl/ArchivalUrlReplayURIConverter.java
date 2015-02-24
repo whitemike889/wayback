@@ -43,7 +43,6 @@ import org.archive.wayback.webapp.AccessPointAware;
  * <p>
  * Replay URL is <i>replayURIPrefix</i>+<i>datespec</i>[<i>context</i>]+{@code "/"}+<i>URL</i>.
  * </p>
- * @author brad
  */
 public class ArchivalUrlReplayURIConverter implements ReplayURIConverter, ReplayURLTransformer,
 		AccessPointAware /*, ContextResultURIConverterFactory*/ {
@@ -124,6 +123,11 @@ public class ArchivalUrlReplayURIConverter implements ReplayURIConverter, Replay
 				UrlOperations.stripDefaultPortFromUrl(url);
 	}
 
+	@Override
+	public ReplayURLTransformer getURLTransformer() {
+		return this;
+	}
+
 	public static boolean isProtocolRelative(String url) {
 		if (url.startsWith("//")) return true;
 		if (url.startsWith("\\/\\/")) return true;
@@ -182,7 +186,10 @@ public class ArchivalUrlReplayURIConverter implements ReplayURIConverter, Replay
 		} catch (URISyntaxException ex) {
 			return url;
 		}
-		return makeReplayURI(replayContext.getDatespec(), absurl, flags, urlStyle);
+		// IMPORTANT: call makeReplayURI through replayContext.
+		// This is to allow for decorating ReplayURIConverter with
+		// custom per-request behavior. See AccessPoint#decorateURIConverter.
+		return replayContext.makeReplayURI(absurl, flags, urlStyle);
 	}
 
 	/*
@@ -235,6 +242,13 @@ public class ArchivalUrlReplayURIConverter implements ReplayURIConverter, Replay
 						replayURIPrefix +
 						" for backward-compatibility. Please configure replayURIPrefix with absolute URL");
 			}
+		} else if (replayURIPrefix.startsWith("//")) {
+			// replayURIPrefix is protocol relative, and no mementpPrefix.
+			// It was combined with custom code building absolute URL with
+			// the protocol of incoming request.
+			replayURIPrefix = "http:" + replayURIPrefix;
+			LOGGER.warning("Prepended \"http:\" to replayURIPrefix for backward-compatibility. " +
+					"Please configure replayURLPrefix with absolute URL");
 		}
 	}
 }

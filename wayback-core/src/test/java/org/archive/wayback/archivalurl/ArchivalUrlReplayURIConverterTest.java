@@ -29,7 +29,9 @@ import org.archive.url.HandyURL;
 import org.archive.url.URLParser;
 import org.archive.wayback.ReplayURIConverter.URLStyle;
 import org.archive.wayback.memento.MementoUtils;
+import org.archive.wayback.replay.ReplayContext;
 import org.archive.wayback.webapp.AccessPoint;
+import org.easymock.EasyMock;
 
 /**
  * Test for {@link ArchivalUrlReplayURIConverter}
@@ -85,7 +87,31 @@ public class ArchivalUrlReplayURIConverterTest extends TestCase {
 			assertEquals("//web.archive.org/web/" + TIMESTAMP + "/" + URL, url);
 		}
 	}
-	
+
+	/**
+	 * {@code transform} method must call {@link ReplayContext#makeReplayURI(String, String, URLStyle)}
+	 * for replay URL construction, must not call {@code makeReplayURI} in the same class directly.
+	 * @throws Exception
+	 */
+	public void testTransformBuildsURLThroughReplayContext() throws Exception {
+		final ArchivalUrlReplayURIConverter cut = new ArchivalUrlReplayURIConverter();
+		cut.setReplayURIPrefix("http://web.archive.org/web/");
+
+		final ReplayContext replayContext = EasyMock.createMock(ReplayContext.class);
+
+		final String url = "http://example.com/";
+		final String datespec = "20100505101010";
+		EasyMock.expect(replayContext.resolve(url)).andReturn(url);
+		EasyMock.expect(replayContext.makeReplayURI(url, "", URLStyle.ABSOLUTE))
+			.andReturn(cut.getReplayURIPrefix() + datespec + "/" + url);
+
+		EasyMock.replay(replayContext);
+
+		cut.transform(replayContext, url, "");
+
+		EasyMock.verify(replayContext);
+	}
+
 	/**
 	 * For backward compatibility, ArchivalUrlReplayURIConverter complements
 	 * relative {@code replayPrefix} with {@code aggregationPrefix} config parameter.
@@ -99,10 +125,32 @@ public class ArchivalUrlReplayURIConverterTest extends TestCase {
 		ap.setReplayPrefix("/web/");
 		ap.setConfigs(new Properties());
 		ap.getConfigs().setProperty(MementoUtils.AGGREGATION_PREFIX_CONFIG, AGGREGATION_PREFIX);
-		
+
 		cut.setAccessPoint(ap);
-		
+
 		assertEquals(AGGREGATION_PREFIX + "/web/", cut.getReplayURIPrefix());
+	}
+
+	public void testProtocolRelativeReplayPrefix() throws Exception {
+		// Backward compatibility test 2:
+		// replayPrefix is protocol relative, no aggregation prefix
+		ArchivalUrlReplayURIConverter cut = new ArchivalUrlReplayURIConverter();
+		AccessPoint ap = new AccessPoint();
+		ap.setReplayPrefix("//web.archive.org/web/");
+		ap.setConfigs(new Properties());
+
+		cut.setAccessPoint(ap);
+
+		final String url = "http://example.com/index.html";
+		final String datespec = "20100505010203";
+
+		String result1 = cut.makeReplayURI(datespec, url, "",
+			URLStyle.SERVER_RELATIVE);
+		assertEquals("/web/" + datespec + "/" + url, result1);
+
+		String result2 = cut.makeReplayURI(datespec, url, "", URLStyle.ABSOLUTE);
+		assertEquals("http://web.archive.org/web/" + datespec + "/" + url,
+			result2);
 	}
 
 	/**
