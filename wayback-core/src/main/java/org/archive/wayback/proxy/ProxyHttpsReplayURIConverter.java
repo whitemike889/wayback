@@ -55,6 +55,11 @@ public class ProxyHttpsReplayURIConverter implements ReplayURIConverter, ReplayU
 		return url;
 	}
 
+	@Override
+	public ReplayURLTransformer getURLTransformer() {
+		return this;
+	}
+
 	/**
 	 * Rewrites {@code https://} to {@code http://} if {@link #isRewriteHttps()}.
 	 */
@@ -70,6 +75,6 @@ public class ProxyHttpsReplayURIConverter implements ReplayURIConverter, ReplayU
 				// not a valid absolute URL - let it go
 			}
 		}
-		return makeReplayURI(replayContext.getDatespec(), url, null, URLStyle.ABSOLUTE);
+		return replayContext.makeReplayURI(url, null, URLStyle.ABSOLUTE);
 	}
 }
