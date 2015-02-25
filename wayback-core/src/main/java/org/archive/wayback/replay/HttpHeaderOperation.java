@@ -105,6 +105,13 @@ public class HttpHeaderOperation {
 			value = (value == null) ? "" : value;
 			response.setHeader(key,value);
 		}
+		
+		setCacheHeaders(response);
+	}
+	
+	public static void setCacheHeaders(HttpServletResponse response) {
+        response.setHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
+        response.setHeader("Pragma", "no-cache");
 	}
 	
 	public static String getContentLength(Map<String,String> headers) {
