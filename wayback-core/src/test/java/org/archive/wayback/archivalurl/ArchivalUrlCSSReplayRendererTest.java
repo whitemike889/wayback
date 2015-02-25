@@ -61,6 +61,10 @@ public class ArchivalUrlCSSReplayRendererTest extends TestCase {
         
         response = EasyMock.createMock(HttpServletResponse.class);
         EasyMock.expect(response.getOutputStream()).andReturn(servletOutput);
+        response.setHeader("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate");
+        EasyMock.expectLastCall().once();
+        response.setHeader("Pragma", "no-cache");
+        EasyMock.expectLastCall().once();
         
         wbRequest = new WaybackRequest();
         wbRequest.setFrameWrapperContext(false);
