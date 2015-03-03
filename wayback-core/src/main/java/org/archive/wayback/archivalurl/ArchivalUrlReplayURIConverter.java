@@ -164,6 +164,9 @@ public class ArchivalUrlReplayURIConverter implements ReplayURIConverter, Replay
 			return url;
 		}
 
+		//for https://webarchive.jira.com/browse/ARI-4033
+		url = url.replaceAll("^(https?)%3A%2F%2F", "$1://");
+		
 		// don't rewrite full and path-relative URLs. For
 		// https://webarchive.jira.com/browse/ARI-3985.
 		// Keep the style of URL (ARI-4033).
