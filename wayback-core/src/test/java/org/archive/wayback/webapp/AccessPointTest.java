@@ -243,18 +243,13 @@ public class AccessPointTest extends TestCase {
 		Logger.getLogger(PerfStats.class.getName()).setLevel(Level.WARNING);
 	}
 
-	public static Resource createTestHtmlResource(String uri, String timestamp,
-			byte[] payloadBytes) throws IOException {
-		// default compresssed=true - it often reveals bugs.
-		return createTestHtmlResource(uri, timestamp, payloadBytes, true);
-	}
-
-	public static Resource createTestHtmlResource(String uri, String timestamp,
-			byte[] payloadBytes, boolean compressed) throws IOException {
-		TestWARCRecordInfo recinfo = compressed ? TestWARCRecordInfo
-			.createCompressedHttpResponse("text/html", payloadBytes)
-				: TestWARCRecordInfo.createHttpResponse("text/html",
-					payloadBytes);
+	public static Resource createTestResource(String uri, String timestamp,
+			String contentType, byte[] payloadBytes, boolean compressed)
+			throws IOException {
+		TestWARCRecordInfo recinfo = (compressed ? TestWARCRecordInfo
+				.createCompressedHttpResponse(contentType, payloadBytes)
+				: TestWARCRecordInfo.createHttpResponse(contentType,
+					payloadBytes));
 		recinfo.setCreate14DigitDateFromDT14(timestamp);
 		if (uri != null)
 			recinfo.setUrl(uri);
@@ -263,6 +258,17 @@ public class AccessPointTest extends TestCase {
 		WarcResource resource = new WarcResource(rec, ar);
 		resource.parseHeaders();
 		return resource;
+	}
+
+	public static Resource createTestHtmlResource(String uri, String timestamp,
+			byte[] payloadBytes) throws IOException {
+		// default compresssed=true - it often reveals bugs.
+		return createTestHtmlResource(uri, timestamp, payloadBytes, true);
+	}
+
+	public static Resource createTestHtmlResource(String uri, String timestamp,
+			byte[] payloadBytes, boolean compressed) throws IOException {
+		return createTestResource(uri, timestamp, "text/html", payloadBytes, compressed);
 	}
 
 	public static Resource createTestHtmlResource(String timestamp,
@@ -617,6 +623,34 @@ public class AccessPointTest extends TestCase {
 		// when closest's timestamp is different from replay requests's
 		// timestamp, it redirects to closest's timestamp.
 		expectRedirect("/web/20100601000000/http://test.example.com/");
+
+		EasyMock.replay(httpRequest, httpResponse, resourceIndex,
+			resourceStore, replay);
+
+		cut.init();
+		boolean r = cut.handleRequest(httpRequest, httpResponse);
+
+		EasyMock.verify(resourceIndex, resourceStore, replay);
+
+		assertTrue("handleRequest return value", r);
+	}
+
+	/**
+	 * Supplemental to previous test, datespec flags shall be preserved
+	 * upon date redirect.
+	 * @throws Exception
+	 */
+	public void testHandleRequest_1_1() throws Exception {
+		setReplayRequest("http://www.example.com/c.gif", "20100601123456");
+		// set "im_" flag
+		wbRequest.setIMGContext(true);
+
+		setupCaptures(
+			0,
+			createTestResource("http://www.example.com/c.gif",
+				"20100601000000", "image/gif", TestWARCRecordInfo.PAYLOAD_GIF,
+				false));
+		expectRedirect("/web/20100601000000im_/http://www.example.com/c.gif");
 
 		EasyMock.replay(httpRequest, httpResponse, resourceIndex,
 			resourceStore, replay);
