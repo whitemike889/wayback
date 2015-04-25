@@ -465,6 +465,9 @@ public class EmbeddedCDXServerIndex extends AbstractRequestHandler implements Me
 			WaybackRequest wbRequest, AuthToken waybackAuthToken,
 			boolean isFuzzy) {
 		final CDXQuery query = createQuery(wbRequest, isFuzzy);
+		// set explicit matchType, or CDXServer will run prefix
+		// query when URL ends with "*".
+		query.setMatchType(MatchType.exact);
 
 		if (isFuzzy && query == null) {
 			return null;
