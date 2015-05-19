@@ -50,49 +50,6 @@ public class FlatFileResourceFileLocationDB implements ResourceFileLocationDB  {
 	}
 
 	@SuppressWarnings("unchecked")
-	public String[] nameToUrls(String name, Comparator<String> comparator)
-			throws IOException {
-
-		if (comparator == null) {
-			return nameToUrls(name);
-		} else {
-			ArrayList<String> fullRecords = new ArrayList<String>();
-			ArrayList<String> urls = new ArrayList<String>();
-			String prefix = name + delimiter;
-			Iterator<String> itr = flatFile.getRecordIterator(prefix);
-
-			while (itr.hasNext()) {
-				String record = itr.next();
-
-				if (record.startsWith(prefix)) {
-					fullRecords.add(record);
-				} else {
-					break;
-				}
-			}
-
-			Collections.sort(fullRecords, comparator);
-
-			for (String record : fullRecords) {
-				urls.add(record.substring(prefix.length()));
-			}
-
-			if (itr instanceof CloseableIterator) {
-				CloseableIterator<String> citr = (CloseableIterator<String>)itr;
-				citr.close();
-			}
-			if (urls.size() == 0) {
-				LOGGER.info("No locations for " + name + " in " + path);
-			}
-			String[] a = new String[urls.size()];
-			for (int i = 0; i < urls.size(); i++) {
-				a[i] = urls.get(i);
-			}
-			return a;
-		}
-	}
-	
-	@SuppressWarnings("unchecked")
 	public String[] nameToUrls(String name) throws IOException {
 		ArrayList<String> urls = new ArrayList<String>();
 		String prefix = name + delimiter;
