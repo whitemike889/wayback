@@ -203,6 +203,11 @@ public class SimpleMimeTypeDetector implements MimeTypeDetector {
 				return "video/quicktime";
 			}
 			break;
+		case 'w':
+			if (bytes[1] == 'O' && bytes[2] == 'F' && (bytes[3] == 'F' || bytes[3] == '2')) {
+				return "application/font-woff";
+			}
+			break;
 		case '{':
 			if (bytes[1] == '\\' && bytes[2] == 'r' && bytes[3] == 't' && bytes[4] == 'f' && bytes[5] == '1') {
 				return "application/rtf";
@@ -298,10 +303,10 @@ public class SimpleMimeTypeDetector implements MimeTypeDetector {
 			text = text.substring(1);
 		}
 
-		ctype = detectHTML(text);
+		ctype = detectJavaScript(text);
 		if (ctype != null) return ctype;
 
-		ctype = detectJavaScript(text);
+		ctype = detectHTML(text);
 		if (ctype != null) return ctype;
 
 		ctype = detectCSS(text);
@@ -357,26 +362,46 @@ public class SimpleMimeTypeDetector implements MimeTypeDetector {
 		return null;
 	}
 
+	private static final Pattern RE_JS_WS_OR_COMMENT = Pattern
+		.compile("(?m)\\s+|/\\*.*?\\*/|//.*$");
 	private static final Pattern RE_JS_VAR = Pattern
 		.compile("(?m)^var\\s+[_a-zA-Z$][_a-zA-Z$0-9]+");
 	private static final Pattern RE_JS_FUNCTION = Pattern
-		.compile("(?s)function(?:\\s+[a-zA-Z0-9_$]+\\s*)?\\(");
+		.compile("(?s)\\(?function(?:\\s+[a-zA-Z0-9_$]+\\s*)?\\(");
+	private static final Pattern RE_JS_DOCUMENT_WRITE = Pattern.compile("document\\.write\\(");
 	private static final Pattern RE_JSON_HEAD = Pattern
 		.compile("\\s*\\{\\s*\"");
 
 	protected String detectJavaScript(String text) {
+		int pos = 0;
+		{
+			Matcher m = RE_JS_WS_OR_COMMENT.matcher(text);
+			while (m.lookingAt()) {
+				m.region(pos = m.end(), text.length());
+				
+			}
+		}
 		{
 			Matcher m = RE_JS_VAR.matcher(text);
-			if (m.find())
+			m.region(pos, text.length());
+			if (m.lookingAt())
 				return "text/javascript";
 		}
 		{
 			Matcher m = RE_JS_FUNCTION.matcher(text);
-			if (m.find())
+			m.region(pos, text.length());
+			if (m.lookingAt())
+				return "text/javascript";
+		}
+		{
+			Matcher m = RE_JS_DOCUMENT_WRITE.matcher(text);
+			m.region(pos, text.length());
+			if (m.lookingAt())
 				return "text/javascript";
 		}
 		{
 			Matcher m = RE_JSON_HEAD.matcher(text);
+			m.region(pos, text.length());
 			if (m.lookingAt()) {
 				// TODO: if resource has content-type "text/javascript", just
 				// use it.
