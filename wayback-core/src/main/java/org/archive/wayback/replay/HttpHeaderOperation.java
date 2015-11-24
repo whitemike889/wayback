@@ -45,6 +45,7 @@ public class HttpHeaderOperation {
 	public final static String HTTP_CHUNKED_ENCODING_HEADER = 
 		"chunked".toUpperCase();
 	public final static String HTTP_CONTENT_ENCODING = "Content-Encoding";
+	public final static String HTTP_ACCEPT_RANGES = "Accept-Ranges";
 
 	
 	/**
@@ -107,6 +108,9 @@ public class HttpHeaderOperation {
 		}
 	}
 	
+	public static String getAcceptRanges(Map<String,String> headers) {
+		return getHeaderValue(headers,HTTP_ACCEPT_RANGES);
+	}
 	public static String getContentLength(Map<String,String> headers) {
 		return getHeaderValue(headers,HTTP_LENGTH_HEADER);
 	}
