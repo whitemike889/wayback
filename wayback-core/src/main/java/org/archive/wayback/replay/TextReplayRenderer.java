@@ -71,13 +71,13 @@ public abstract class TextReplayRenderer implements ReplayRenderer {
 	
 	public static String ORIG_ENCODING = "X-Archive-Orig-Encoding";
 
-	private String guessedCharsetHeader = GUESSED_CHARSET_HEADER;
+	protected String guessedCharsetHeader = GUESSED_CHARSET_HEADER;
 	private List<String> jspInserts = null;
-	private HttpHeaderProcessor httpHeaderProcessor;
-	private CharsetDetector charsetDetector = new StandardCharsetDetector();
+	protected HttpHeaderProcessor httpHeaderProcessor;
+	protected CharsetDetector charsetDetector = new StandardCharsetDetector();
 
 	@Deprecated
-	private ContextResultURIConverterFactory pageConverterFactory = null;
+	protected ContextResultURIConverterFactory pageConverterFactory = null;
 
 	public TextReplayRenderer(HttpHeaderProcessor httpHeaderProcessor) {
 		this.httpHeaderProcessor = httpHeaderProcessor;
