@@ -20,6 +20,7 @@
 package org.archive.wayback.archivalurl;
 
 import java.io.IOException;
+import java.util.Map;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -31,6 +32,8 @@ import org.archive.wayback.core.CaptureSearchResult;
 import org.archive.wayback.core.CaptureSearchResults;
 import org.archive.wayback.core.Resource;
 import org.archive.wayback.core.WaybackRequest;
+import org.archive.wayback.exception.BadContentException;
+import org.archive.wayback.replay.HttpHeaderOperation;
 import org.archive.wayback.replay.HttpHeaderProcessor;
 import org.archive.wayback.replay.TextDocument;
 import org.archive.wayback.replay.TextReplayRenderer;
@@ -78,4 +81,64 @@ public class ArchivalUrlCSSReplayRenderer extends TextReplayRenderer {
 		page.insertAtStartOfDocument(buildInsertText(page, httpRequest,
 				httpResponse, wbRequest, results, result, resource));
 	}
+
+	@Override
+    public void renderResource(HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse, WaybackRequest wbRequest,
+            CaptureSearchResult result, Resource httpHeadersResource,
+            Resource payloadResource, ResultURIConverter uriConverter,
+            CaptureSearchResults results) throws ServletException,
+            IOException, BadContentException {
+
+        // Decode resource (such as if gzip encoded)
+        Resource decodedResource = decodeResource(httpHeadersResource, payloadResource);
+
+        HttpHeaderOperation.copyHTTPMessageHeader(httpHeadersResource, httpResponse);
+
+        Map<String,String> headers = HttpHeaderOperation.processHeaders(
+                httpHeadersResource, result, uriConverter, httpHeaderProcessor);
+
+        String charSet = charsetDetector.getCharset(httpHeadersResource,
+                decodedResource, wbRequest);
+
+        ResultURIConverter pageConverter = uriConverter;
+        // this feature was meant for using special ResultURIConverter for rewriting XML, but
+        // turned out to be not useful. drop this unless we find other uses.
+        if (pageConverterFactory != null) {
+            // XXX: ad-hoc code - ContextResultURIConverterFactory should take ResultURIConverter
+            // as argument, so that it can simply wrap the original.
+            String replayURIPrefix = (uriConverter instanceof ArchivalUrlResultURIConverter ?
+                    ((ArchivalUrlResultURIConverter)uriConverter).getReplayURIPrefix() : "");
+            ResultURIConverter ruc = pageConverterFactory.getContextConverter(replayURIPrefix);
+            if (ruc != null)
+                pageConverter = ruc;
+        }
+        // Load content into an HTML page, and resolve load-time URLs:
+        TextDocument page = new TextDocument(decodedResource, result,
+                uriConverter);
+        page.readFully(charSet);
+
+        updatePage(page, httpRequest, httpResponse, wbRequest, result,
+                decodedResource, pageConverter, results);
+
+        // set the corrected length:
+        int bytes = page.getBytes().length;
+        headers.put(HttpHeaderOperation.HTTP_LENGTH_HEADER, String.valueOf(bytes));
+        if (guessedCharsetHeader != null) {
+            headers.put(guessedCharsetHeader, page.getCharSet());
+        }
+
+        // send back the headers:
+        HttpHeaderOperation.sendHeaders(headers, httpResponse);
+
+        // Tomcat will always send a charset... It's trying to be smarter than
+        // we are. If the original page didn't include a "charset" as part of
+        // the "Content-Type" HTTP header, then Tomcat will use the default..
+        // who knows what that is, or what that will do to the page..
+        // let's try explicitly setting it to what we used:
+        httpResponse.setCharacterEncoding(page.getCharSet());
+        httpResponse.setContentType("text/css");
+
+        page.writeToOutputStream(httpResponse.getOutputStream());
+    }
 }

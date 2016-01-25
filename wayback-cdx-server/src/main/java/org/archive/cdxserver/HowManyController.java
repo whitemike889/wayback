@@ -192,11 +192,8 @@ public class HowManyController extends BaseCDXServer {
         } else {
             AuthToken authToken = super.createAuthToken(request);
             
-            CDXAccessFilter accessChecker = null;
-            
-			if (!authChecker.isAllUrlAccessAllowed(authToken)) {
-				accessChecker = authChecker.createAccessFilter(authToken);
-			}
+			CDXAccessFilter accessChecker = authChecker
+				.createAccessFilter(authToken);
             
             String[] startEnd = determineRange(url, matchType, from, to);
             start = startEnd[0];
