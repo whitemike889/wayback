@@ -71,7 +71,9 @@ public abstract class TextReplayRenderer implements ReplayRenderer {
 	
 	public static String ORIG_ENCODING = "X-Archive-Orig-Encoding";
 
-	protected String guessedCharsetHeader = GUESSED_CHARSET_HEADER;
+	protected String overrideContentMimeType = null;
+
+	private String guessedCharsetHeader = GUESSED_CHARSET_HEADER;
 	private List<String> jspInserts = null;
 	protected HttpHeaderProcessor httpHeaderProcessor;
 	protected CharsetDetector charsetDetector = new StandardCharsetDetector();
@@ -155,6 +157,9 @@ public abstract class TextReplayRenderer implements ReplayRenderer {
 		// let's try explicitly setting it to what we used:
 		httpResponse.setCharacterEncoding(page.getCharSet());
 
+        if (overrideContentMimeType != null && !overrideContentMimeType.isEmpty()) {
+            httpResponse.setContentType(overrideContentMimeType);
+        }
 		page.writeToOutputStream(httpResponse.getOutputStream());
 	}
 
@@ -207,6 +212,22 @@ public abstract class TextReplayRenderer implements ReplayRenderer {
 		return decodeResource(resource, resource);
 	}
 
+    /**
+     * @return the String HTTP Header 'Content-Type' used in overriding the archived
+     * value during playback.
+     */
+    public String getOverrideContentMimeType() {
+        return overrideContentMimeType;
+    }
+
+    /**
+     * @param overrideContentMimeType the String HTTP Header 'Content-Type' used to
+     * override the archived value.
+     */
+    public void setOverrideContentMimeType(String overrideContentMimeType) {
+        this.overrideContentMimeType = overrideContentMimeType;
+    }
+
 	/**
 	 * return gzip-decoding wrapper Resource if Resource has {@code Content-Encoding: gzip}.
 	 * return {@code payloadResource} otherwise.
@@ -225,19 +246,29 @@ public abstract class TextReplayRenderer implements ReplayRenderer {
 	 */
 	public static Resource decodeResource(Resource headersResource,
 			Resource payloadResource) throws IOException {
-		Map<String, String> headers = headersResource.getHttpHeaders();
+		// Content-Encoding may differ between headersResource and
+		// payloadResource. We use Content-Encoding of payloadResource,
+		// as we're reading content from it. Then update headersResource,
+		// as we're rendering headers from headersResource.
+		Map<String, String> headers = payloadResource.getHttpHeaders();
 
 		if (headers != null) {
 			String encoding = HttpHeaderOperation.getHeaderValue(headers,
 					HttpHeaderOperation.HTTP_CONTENT_ENCODING);
 			if (encoding != null) {
 				if (encoding.toLowerCase().equals(GzipDecodingResource.GZIP)) {
-					headers.put(ORIG_ENCODING, encoding);
-					HttpHeaderOperation.removeHeader(headers,
+					// if headersResource (revisit) has Content-Encoding, set it aside.
+					Map<String, String> revHeaders = headersResource.getHttpHeaders();
+					String revEncoding = HttpHeaderOperation.getHeaderValue(
+						revHeaders, HttpHeaderOperation.HTTP_CONTENT_ENCODING);
+					if (revEncoding != null) {
+						revHeaders.put(ORIG_ENCODING, encoding);
+						HttpHeaderOperation.removeHeader(revHeaders,
 							HttpHeaderOperation.HTTP_CONTENT_ENCODING);
+					}
 
-					if (HttpHeaderOperation.isChunkEncoded(headers)) {
-						HttpHeaderOperation.removeHeader(headers,
+					if (HttpHeaderOperation.isChunkEncoded(revHeaders)) {
+						HttpHeaderOperation.removeHeader(revHeaders,
 								HttpHeaderOperation.HTTP_TRANSFER_ENC_HEADER);
 					}
 
