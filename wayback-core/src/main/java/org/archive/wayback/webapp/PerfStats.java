@@ -15,13 +15,52 @@ public class PerfStats
 	 * output format constants.
 	 */
 	public enum OutputFormat {
-		BRACKET,
-		JSON
+		BRACKET {
+			public void format(Collection<PerfStatEntry> stats, StringBuilder sb) {
+				boolean first = true;
+				sb.append("[");
+				for (PerfStatEntry entry : stats) {
+					if (entry.count > 0) {
+						if (first) {
+							first = false;
+						} else {
+							sb.append(", ");
+						}
+						sb.append(entry.toString());
+					}
+				}
+				sb.append("]");
+			}
+		},
+		JSON {
+			public void format(Collection<PerfStatEntry> stats, StringBuilder sb) {
+				boolean first = true;
+				sb.append('{');
+				for (PerfStatEntry entry : stats) {
+					if (entry.count > 0) {
+						if (first) {
+							first = false;
+						} else {
+							sb.append(',');
+						}
+						sb.append('"').append(entry.name).append("\":");
+						if (entry.isErr)
+							sb.append("null");
+						else
+							sb.append(entry.total);
+					}
+				}
+				sb.append('}');
+			}
+		};
+
+		public abstract void format(Collection<PerfStatEntry> stats,
+				StringBuilder sb);
 	};
 
-	public static class PerfStatEntry
+	public static final class PerfStatEntry
 	{
-		String name;
+		final String name;
 		long start;
 		long total;
 		int count;
@@ -108,6 +147,28 @@ public class PerfStats
 		}		
 	};
 	
+	private final String name;
+	
+	/**
+	 * Prepare static metrics object with this constructor.
+	 * You can call {@link #timeStart()} and {@link #timeEnd()}
+	 * methods on it to add performance measurement without
+	 * defining enum.
+	 * @param name metric name
+	 */
+	public PerfStats(final String name) {
+		this.name = name;
+	}
+	
+	public void timeStart() {
+		get(name).startNow();
+	}
+	
+	public void timeEnd() {
+		get(name).endNow();
+	}
+
+
 	public static PerfStatEntry get(String statName)
 	{
 		PerfStatEntry entry = lastEntry.get();
@@ -197,44 +258,8 @@ public class PerfStats
 	 */
 	public static String getAllStats(OutputFormat format) {
 		StringBuilder sb = new StringBuilder();
-		boolean first = true;
-		
-		Collection<PerfStatEntry> stats = perfStats.get().values();
-		
-		switch (format) {
-		case JSON:
-			sb.append('{');
-			for (PerfStatEntry entry : stats) {
-				if (entry.count > 0) {
-					if (first) {
-						first = false;
-					} else {
-						sb.append(',');
-					}
-					sb.append('"').append(entry.name).append("\":");
-					if (entry.isErr)
-						sb.append("null");
-					else
-						sb.append(entry.total);
-				}
-			}
-			sb.append('}');
-			break;
-		default:
-			sb.append("[");
-			for (PerfStatEntry entry : stats) {
-				if (entry.count > 0) {
-					if (first) {
-						first = false;
-					} else {
-						sb.append(", ");
-					}
-					sb.append(entry.toString());
-				}
-			}			
-			sb.append("]");
-			break;
-		}
+		Collection<PerfStatEntry> stats = perfStats.get().values();	
+		format.format(stats, sb);
 		return sb.toString();
 	}
 }

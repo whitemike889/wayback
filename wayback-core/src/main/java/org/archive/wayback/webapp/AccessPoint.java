@@ -780,8 +780,6 @@ public class AccessPoint extends AbstractRequestHandler implements
 			}
 		}
 
-		PerformanceLogger p = new PerformanceLogger("replay");
-
 		// If optimized url+timestamp search is supported, mark the request
 		if (this.isTimestampSearch()) {
 			if (wbRequest.isAnyEmbeddedContext() || wbRequest.isIdentityContext()) {
@@ -789,12 +787,7 @@ public class AccessPoint extends AbstractRequestHandler implements
 			}
 		}
 
-		CaptureSearchResults captureResults;
-		try {
-			captureResults = searchCaptures(wbRequest);
-		} finally {
-			p.queried();
-		}
+		CaptureSearchResults captureResults = searchCaptures(wbRequest);
 
 		ReplayCaptureSelector captureSelector = new DefaultReplayCaptureSelector(getReplay());
 		captureSelector.setRequest(wbRequest);
@@ -926,8 +919,6 @@ public class AccessPoint extends AbstractRequestHandler implements
 					handleReplayRedirect(wbRequest, httpResponse, captureResults, closest);
 				}
 
-				p.retrieved();
-
 				ReplayRenderer renderer =
 						getReplay().getRenderer(wbRequest, closest, httpHeadersResource, payloadResource);
 
@@ -968,10 +959,6 @@ public class AccessPoint extends AbstractRequestHandler implements
 
 				renderer.renderResource(httpRequest, httpResponse, wbRequest,
 					closest, httpHeadersResource, payloadResource, uriConverter, captureResults);
-
-				p.rendered();
-				p.write(wbRequest.getReplayTimestamp() + " " +
-						wbRequest.getRequestUrl());
 
 				break;
 
@@ -1190,8 +1177,6 @@ public class AccessPoint extends AbstractRequestHandler implements
 			HttpServletRequest httpRequest, HttpServletResponse httpResponse)
 			throws ServletException, IOException, WaybackException {
 
-		PerformanceLogger p = new PerformanceLogger("query");
-
 		// TODO: move this Memento code out of this method.
 		// Memento: render timemap
 		if ((this.getMementoHandler() != null) &&
@@ -1210,8 +1195,6 @@ public class AccessPoint extends AbstractRequestHandler implements
 		wbRequest.setCollapseTime(getQueryCollapseTime());
 		
 		SearchResults results = queryIndex(wbRequest);
-
-		p.queried();
 
 		if (results instanceof CaptureSearchResults) {
 			CaptureSearchResults cResults = (CaptureSearchResults)results;
@@ -1234,8 +1217,6 @@ public class AccessPoint extends AbstractRequestHandler implements
 		} else {
 			throw new WaybackException("Unknown index format");
 		}
-		p.rendered();
-		p.write(wbRequest.getRequestUrl());
 	}
 
 	/**
