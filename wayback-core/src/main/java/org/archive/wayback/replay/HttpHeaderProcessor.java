@@ -32,6 +32,8 @@ import org.archive.wayback.core.CaptureSearchResult;
  */
 public interface HttpHeaderProcessor {
 
+	// TODO: consolidate constants with org.archive.wayback.replay.HttpHeaderOperation
+
 	public final static String HTTP_LENGTH_HEADER = "Content-Length";
 	public final static String HTTP_LENGTH_HEADER_UP = 
 		HTTP_LENGTH_HEADER.toUpperCase();
@@ -56,16 +58,39 @@ public interface HttpHeaderProcessor {
 	public final static String HTTP_CONTENT_DISP_HEADER_UP = 
 		HTTP_CONTENT_DISP_HEADER.toUpperCase();
 
+	public final static String HTTP_CONTENT_RANGE_HEADER = "Content-Range";
+	public final static String HTTP_CONTENT_RANGE_HEADER_UP =
+			HTTP_CONTENT_RANGE_HEADER.toUpperCase();
+
+	public final static String HTTP_TRANSFER_ENCODING_HEADER = "Transfer-Encoding";
+	/**
+	 * Transfer-Encoding in all-uppercase
+	 */
+	public final static String HTTP_TRANSFER_ENCODING_HEADER_UP =
+			HTTP_TRANSFER_ENCODING_HEADER.toUpperCase();
 	
 	/**
-	 * optionally add header key:value to output for later returning to client
-	 * 
+	 * optionally add header key:value to output for later returning to client.
+	 * <p>
+	 * Use {@link #filter(Map, String, String, ReplayRewriteContext)} instead.
+	 * This method will be deprecated.
+	 * </p>
 	 * @param output
 	 * @param key
 	 * @param value
-	 * @param uriConverter 
-	 * @param result 
+	 * @param uriConverter
+	 * @param result
 	 */
 	public void filter(Map<String,String> output, String key, String value,
 			final ResultURIConverter uriConverter, CaptureSearchResult result);
+
+	/**
+	 * Render HTTP header field {@code key}: {@code value} from Resource
+	 * @param output a map to save headers into
+	 * @param key header field name
+	 * @param value header field value
+	 * @param context provides access to projection scheme and capture information.
+	 */
+	public void filter(Map<String, String> output, String key, String value,
+			ReplayRewriteContext context);
 }

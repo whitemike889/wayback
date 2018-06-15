@@ -31,9 +31,8 @@ public class FlatFileResourceFileLocationDB implements ResourceFileLocationDB  {
 	private final static Logger LOGGER =
 		Logger.getLogger(FlatFileResourceFileLocationDB.class.getName());
 	private String path = null;
-	private FlatFile flatFile = null;
 	private String delimiter = "\t";
-	
+    protected FlatFile flatFile = null;
 
 	public void addNameUrl(String name, String url) throws IOException {
 		// NO-OP
@@ -61,6 +60,7 @@ public class FlatFileResourceFileLocationDB implements ResourceFileLocationDB  {
 				break;
 			}
 		}
+		
 		if(itr instanceof CloseableIterator) {
 			CloseableIterator<String> citr = (CloseableIterator<String>) itr;
 			citr.close();

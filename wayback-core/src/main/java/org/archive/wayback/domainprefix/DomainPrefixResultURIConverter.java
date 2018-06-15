@@ -28,7 +28,7 @@ import org.archive.wayback.ResultURIConverter;
  *
  *
  * @author brad
- * @version $Date$, $Revision$
+ * @deprecated 2015-02-10 Use {@link DomainPrefixReplayURIConverter}
  */
 public class DomainPrefixResultURIConverter implements ResultURIConverter {
 

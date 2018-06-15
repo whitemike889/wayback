@@ -1,13 +1,11 @@
 package org.archive.cdxserver.filter;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import org.archive.cdxserver.format.CDXFormat;
 import org.archive.format.cdx.CDXLine;
-import org.archive.format.cdx.FieldSplitFormat;
 import org.archive.format.cdx.FieldSplitLine;
 
 /**
@@ -31,7 +29,7 @@ public class FieldRegexFilter implements CDXFilter {
 	final static String CONTAINS_CHAR = "~";
 	final static String FIELD_SEP_CHAR = ":";
 	
-	final protected FieldSplitFormat names;
+	final protected CDXFormat names;
 	final protected List<RegexMatch> regexMatchers;
 	
 	class RegexMatch {
@@ -42,12 +40,6 @@ public class FieldRegexFilter implements CDXFilter {
 		
 		RegexMatch(String str)
 		{
-			try {
-				str = URLDecoder.decode(str, "UTF-8");
-			} catch (UnsupportedEncodingException e) {
-
-			}
-			
 			boolean contains = false;
 			
 			if (str.startsWith(CONTAINS_CHAR)) {
@@ -132,9 +124,9 @@ public class FieldRegexFilter implements CDXFilter {
 	}
 	
 	
-	public FieldRegexFilter(String[] regexs, FieldSplitFormat names)
+	public FieldRegexFilter(String[] regexs, CDXFormat names)
 	{
-	  this.names = names;
+		this.names = names;
 		this.regexMatchers = new ArrayList<RegexMatch>(regexs.length);
 		
 		for (String regex : regexs) {

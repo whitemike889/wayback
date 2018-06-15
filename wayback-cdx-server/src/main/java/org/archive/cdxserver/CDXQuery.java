@@ -7,369 +7,370 @@ import org.archive.url.UrlSurtRangeComputer.MatchType;
 import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.ServletRequestUtils;
 
+/**
+ * container for CDX query parameters.
+ * @see CDXServer
+ *
+ */
 public class CDXQuery {
-	
-	public static String EMPTY_STRING = "";
-	
-	public enum SortType
-	{
-		regular,
-		reverse,
-		closest,
-	};
-	
-	String url;
-	
-	MatchType matchType = null;
 
-	String matchTypeStr = null;
+    public static final String EMPTY_STRING = "";
 
-	String from = EMPTY_STRING;
-	String to = EMPTY_STRING;
-	String closest = EMPTY_STRING;
-	
-	SortType sort = null;
-	
-	int collapseTime = 0;
+    public enum SortType {
+        regular, reverse, closest,
+    };
 
-	Boolean gzip = null;
-	String output = EMPTY_STRING;
+    String url;
 
-	String[] filter = null;
-	String[] collapse = null;
+    MatchType matchType = null;
 
-	boolean showDupeCount =  false;
+    String matchTypeStr = null;
+
+    String from = EMPTY_STRING;
+    String to = EMPTY_STRING;
+    String closest = EMPTY_STRING;
+
+    SortType sort = null;
+
+    int collapseTime = -1;
+
+    Boolean gzip = null;
+
+    String[] filter = null;
+    String[] collapse = null;
+
+    boolean showDupeCount = false;
     boolean resolveRevisits = false;
-	boolean showGroupCount = false;
-	boolean lastSkipTimestamp = false;
-	boolean showUniqCount = false;
-	
-	int offset = 0;
-	int limit = 0;
-	boolean last = false;
-	Boolean fastLatest = null;
-	String fl = EMPTY_STRING;
-	
-	int page = -1;
-	int pageSize = 0;
+    boolean showGroupCount = false;
+    boolean lastSkipTimestamp = false;
+    boolean showUniqCount = false;
 
-	boolean showNumPages = false;
-	boolean showPagedIndex = false;
+    int offset = 0;
+    int limit = 0;
+    boolean last = false;
+    Boolean fastLatest = null;
+    String fl = EMPTY_STRING;
 
-	String resumeKey = EMPTY_STRING;
-	boolean showResumeKey = false;
-	
+    int page = -1;
+    int pageSize = 0;
 
-	public CDXQuery()
-	{
-		
-	}
-	
-	public CDXQuery(String url)
-	{
-		this.url = url;
-	}
-	
-	public CDXQuery(HttpServletRequest request)
-	{
-		try {
-	        fill(request);
+    boolean showNumPages = false;
+    boolean showPagedIndex = false;
+
+    String resumeKey = EMPTY_STRING;
+    boolean showResumeKey = false;
+
+    public CDXQuery() {
+
+    }
+
+    public CDXQuery(String url) {
+        this.url = url;
+    }
+
+    public CDXQuery(HttpServletRequest request) {
+        try {
+            fill(request);
         } catch (ServletRequestBindingException e) {
-        	//Ignore
+            // Ignore
         }
-	}
-	
-	protected <E extends Enum<E>> E getEnumValue(HttpServletRequest request, String name, Class<E> eclass, E defaultValue)
-	{
-		String enumStr = ServletRequestUtils.getStringParameter(request, name, null);
-		
-		E enumVal = defaultValue;
-		
-		if (enumStr != null) {
-			try {
-				enumVal = Enum.valueOf(eclass, enumStr);
-			} catch (IllegalArgumentException ill) {
-				
-			}
-		}
-		
-		return enumVal;
-	}
-		
-	public void fill(HttpServletRequest request) throws ServletRequestBindingException
-	{
-		if (this.url == null) {
-			url = ServletRequestUtils.getRequiredStringParameter(request, "url");
-		}
-		
-		matchType = getEnumValue(request, "matchType", UrlSurtRangeComputer.MatchType.class, null);
+    }
 
-		from = ServletRequestUtils.getStringParameter(request, "from", from);
-		to = ServletRequestUtils.getStringParameter(request, "to", "");
-		closest = ServletRequestUtils.getStringParameter(request, "closest", "");
-		
-		sort = getEnumValue(request, "sort", SortType.class, SortType.regular);
-		collapseTime = ServletRequestUtils.getIntParameter(request, "collapseTime", 0);
+    protected <E extends Enum<E>> E getEnumValue(HttpServletRequest request,
+            String name, Class<E> eclass, E defaultValue) {
+        String enumStr = ServletRequestUtils.getStringParameter(request, name,
+                null);
 
-		gzip = ServletRequestUtils.getBooleanParameter(request, "gzip");
-		
-		output = ServletRequestUtils.getStringParameter(request, "output", output);
+        E enumVal = defaultValue;
 
-		filter = ServletRequestUtils.getStringParameters(request, "filter");
-		collapse = ServletRequestUtils.getStringParameters(request, "collapse");
-		
-		showDupeCount = ServletRequestUtils.getBooleanParameter(request, "showDupeCount", false);
-        resolveRevisits = ServletRequestUtils.getBooleanParameter(request, "resolveRevisits", false);
-		showGroupCount = ServletRequestUtils.getBooleanParameter(request, "showGroupCount", false);
-		lastSkipTimestamp = ServletRequestUtils.getBooleanParameter(request, "lastSkipTimestamp", false);
-		showUniqCount = ServletRequestUtils.getBooleanParameter(request, "showUniqCount", false);
-		
-		offset = ServletRequestUtils.getIntParameter(request, "offset", 0);
-		limit = ServletRequestUtils.getIntParameter(request, "limit", 0);
-		last = ServletRequestUtils.getBooleanParameter(request, "last", false);
-		fastLatest = ServletRequestUtils.getBooleanParameter(request, "fastLatest");
-		fl = ServletRequestUtils.getStringParameter(request, "fl", "");
-		
-		page = ServletRequestUtils.getIntParameter(request, "page", -1);
-		pageSize = ServletRequestUtils.getIntParameter(request, "pageSize", 0);
+        if (enumStr != null) {
+            try {
+                enumVal = Enum.valueOf(eclass, enumStr);
+            } catch (IllegalArgumentException ill) {
 
-		showNumPages = ServletRequestUtils.getBooleanParameter(request, "showNumPages", false);
-		showPagedIndex = ServletRequestUtils.getBooleanParameter(request, "showPagedIndex", false);
+            }
+        }
 
-		resumeKey = ServletRequestUtils.getStringParameter(request, "resumeKey", "");
-		showResumeKey = ServletRequestUtils.getBooleanParameter(request, "showResumeKey", false);		
-	}
+        return enumVal;
+    }
 
-	public String getUrl() {
-		return url;
-	}
+    public void fill(HttpServletRequest request)
+            throws ServletRequestBindingException {
+        if (this.url == null) {
+            url = ServletRequestUtils
+                    .getRequiredStringParameter(request, "url");
+        }
 
-	public void setUrl(String url) {
-		this.url = url;
-	}
+        matchType = getEnumValue(request, "matchType",
+                UrlSurtRangeComputer.MatchType.class, null);
 
-	public MatchType getMatchType() {
-		return matchType;
-	}
+        from = ServletRequestUtils.getStringParameter(request, "from", from);
+        to = ServletRequestUtils.getStringParameter(request, "to", "");
+        closest = ServletRequestUtils
+                .getStringParameter(request, "closest", "");
 
-	public void setMatchType(MatchType matchType) {
-		this.matchType = matchType;
-	}
+        sort = getEnumValue(request, "sort", SortType.class, SortType.regular);
+        collapseTime = ServletRequestUtils.getIntParameter(request,
+                "collapseTime", 0);
 
-	public String getMatchTypeStr() {
-		return matchTypeStr;
-	}
+        gzip = ServletRequestUtils.getBooleanParameter(request, "gzip");
 
-	public void setMatchTypeStr(String matchTypeStr) {
-		this.matchTypeStr = matchTypeStr;
-	}
+        filter = ServletRequestUtils.getStringParameters(request, "filter");
+        collapse = ServletRequestUtils.getStringParameters(request, "collapse");
 
-	public String getFrom() {
-		return from;
-	}
+        showDupeCount = ServletRequestUtils.getBooleanParameter(request,
+                "showDupeCount", false);
+        resolveRevisits = ServletRequestUtils.getBooleanParameter(request,
+                "resolveRevisits", false);
+        showGroupCount = ServletRequestUtils.getBooleanParameter(request,
+                "showGroupCount", false);
+        lastSkipTimestamp = ServletRequestUtils.getBooleanParameter(request,
+                "lastSkipTimestamp", false);
+        showUniqCount = ServletRequestUtils.getBooleanParameter(request,
+                "showUniqCount", false);
 
-	public void setFrom(String from) {
-		this.from = from;
-	}
+        offset = ServletRequestUtils.getIntParameter(request, "offset", 0);
+        limit = ServletRequestUtils.getIntParameter(request, "limit", 0);
+        last = ServletRequestUtils.getBooleanParameter(request, "last", false);
+        fastLatest = ServletRequestUtils.getBooleanParameter(request,
+                "fastLatest");
+        fl = ServletRequestUtils.getStringParameter(request, "fl", "");
 
-	public String getTo() {
-		return to;
-	}
+        page = ServletRequestUtils.getIntParameter(request, "page", -1);
+        pageSize = ServletRequestUtils.getIntParameter(request, "pageSize", 0);
 
-	public void setTo(String to) {
-		this.to = to;
-	}
+        showNumPages = ServletRequestUtils.getBooleanParameter(request,
+                "showNumPages", false);
+        showPagedIndex = ServletRequestUtils.getBooleanParameter(request,
+                "showPagedIndex", false);
 
-	public String getClosest() {
-		return closest;
-	}
+        resumeKey = ServletRequestUtils.getStringParameter(request,
+                "resumeKey", "");
+        showResumeKey = ServletRequestUtils.getBooleanParameter(request,
+                "showResumeKey", false);
+    }
 
-	public void setClosest(String closest) {
-		this.closest = closest;
-	}
+    public String getUrl() {
+        return url;
+    }
 
-	public SortType getSort() {
-		return sort;
-	}
+    public void setUrl(String url) {
+        this.url = url;
+    }
 
-	public void setSort(SortType sort) {
-		this.sort = sort;
-	}
-	
-	public boolean isReverse() {
-		return this.sort == SortType.reverse;
-	}
-	
-	public boolean isSortClosest()
-	{
-		return this.sort == SortType.closest;
-	}
+    public MatchType getMatchType() {
+        return matchType;
+    }
 
-	public Boolean isGzip() {
-		return gzip;
-	}
+    public void setMatchType(MatchType matchType) {
+        this.matchType = matchType;
+    }
 
-	public void setGzip(Boolean gzip) {
-		this.gzip = gzip;
-	}
+    public String getMatchTypeStr() {
+        return matchTypeStr;
+    }
 
-	public String getOutput() {
-		return output;
-	}
+    public void setMatchTypeStr(String matchTypeStr) {
+        this.matchTypeStr = matchTypeStr;
+    }
 
-	public void setOutput(String output) {
-		this.output = output;
-	}
+    public String getFrom() {
+        return from;
+    }
 
-	public String[] getFilter() {
-		return filter;
-	}
+    public void setFrom(String from) {
+        this.from = from;
+    }
 
-	public void setFilter(String[] filter) {
-		this.filter = filter;
-	}
+    public String getTo() {
+        return to;
+    }
 
-	public String[] getCollapse() {
-		return collapse;
-	}
+    public void setTo(String to) {
+        this.to = to;
+    }
 
-	public void setCollapse(String[] collapse) {
-		this.collapse = collapse;
-	}
+    public String getClosest() {
+        return closest;
+    }
 
-	public boolean isShowDupeCount() {
-		return showDupeCount;
-	}
+    public void setClosest(String closest) {
+        this.closest = closest;
+    }
 
-	public void setShowDupeCount(boolean showDupeCount) {
-		this.showDupeCount = showDupeCount;
-	}
+    public SortType getSort() {
+        return sort;
+    }
 
-	public boolean isResolveRevisits() {
-		return resolveRevisits;
-	}
+    public void setSort(SortType sort) {
+        this.sort = sort;
+    }
 
-	public void setResolveRevisits(boolean resolveRevisits) {
-		this.resolveRevisits = resolveRevisits;
-	}
+    public boolean isReverse() {
+        return this.sort == SortType.reverse;
+    }
 
-	public boolean isShowGroupCount() {
-		return showGroupCount;
-	}
+    public boolean isSortClosest() {
+        return this.sort == SortType.closest;
+    }
 
-	public void setShowGroupCount(boolean showGroupCount) {
-		this.showGroupCount = showGroupCount;
-	}
+    public Boolean isGzip() {
+        return gzip;
+    }
 
-	public boolean isLastSkipTimestamp() {
-		return lastSkipTimestamp;
-	}
+    public void setGzip(Boolean gzip) {
+        this.gzip = gzip;
+    }
 
-	public void setLastSkipTimestamp(boolean lastSkipTimestamp) {
-		this.lastSkipTimestamp = lastSkipTimestamp;
-	}
+    public String[] getFilter() {
+        return filter;
+    }
 
-	public boolean isShowUniqCount() {
-		return showUniqCount;
-	}
+    public void setFilter(String[] filter) {
+        this.filter = filter;
+    }
 
-	public void setShowUniqCount(boolean showUniqCount) {
-		this.showUniqCount = showUniqCount;
-	}
+    public String[] getCollapse() {
+        return collapse;
+    }
 
-	public int getOffset() {
-		return offset;
-	}
+    public void setCollapse(String[] collapse) {
+        this.collapse = collapse;
+    }
 
-	public void setOffset(int offset) {
-		this.offset = offset;
-	}
+    public boolean isShowDupeCount() {
+        return showDupeCount;
+    }
 
-	public int getLimit() {
-		return limit;
-	}
+    public void setShowDupeCount(boolean showDupeCount) {
+        this.showDupeCount = showDupeCount;
+    }
 
-	public void setLimit(int limit) {
-		this.limit = limit;
-	}
+    public boolean isResolveRevisits() {
+        return resolveRevisits;
+    }
 
-	public boolean isLast() {
-		return last;
-	}
+    public void setResolveRevisits(boolean resolveRevisits) {
+        this.resolveRevisits = resolveRevisits;
+    }
 
-	public void setLast(boolean last) {
-		this.last = last;
-	}
+    public boolean isShowGroupCount() {
+        return showGroupCount;
+    }
 
-	public Boolean getFastLatest() {
-		return fastLatest;
-	}
+    public void setShowGroupCount(boolean showGroupCount) {
+        this.showGroupCount = showGroupCount;
+    }
 
-	public void setFastLatest(Boolean fastLatest) {
-		this.fastLatest = fastLatest;
-	}
+    public boolean isLastSkipTimestamp() {
+        return lastSkipTimestamp;
+    }
 
-	public String getFl() {
-		return fl;
-	}
+    public void setLastSkipTimestamp(boolean lastSkipTimestamp) {
+        this.lastSkipTimestamp = lastSkipTimestamp;
+    }
 
-	public void setFl(String fl) {
-		this.fl = fl;
-	}
+    public boolean isShowUniqCount() {
+        return showUniqCount;
+    }
 
-	public int getPage() {
-		return page;
-	}
+    public void setShowUniqCount(boolean showUniqCount) {
+        this.showUniqCount = showUniqCount;
+    }
 
-	public void setPage(int page) {
-		this.page = page;
-	}
+    public int getOffset() {
+        return offset;
+    }
 
-	public int getPageSize() {
-		return pageSize;
-	}
+    public void setOffset(int offset) {
+        this.offset = offset;
+    }
 
-	public void setPageSize(int pageSize) {
-		this.pageSize = pageSize;
-	}
+    public int getLimit() {
+        return limit;
+    }
 
-	public boolean isShowNumPages() {
-		return showNumPages;
-	}
+    public void setLimit(int limit) {
+        this.limit = limit;
+    }
 
-	public void setShowNumPages(boolean showNumPages) {
-		this.showNumPages = showNumPages;
-	}
+    public boolean isLast() {
+        return last;
+    }
 
-	public boolean isShowPagedIndex() {
-		return showPagedIndex;
-	}
+    public void setLast(boolean last) {
+        this.last = last;
+    }
 
-	public void setShowPagedIndex(boolean showPagedIndex) {
-		this.showPagedIndex = showPagedIndex;
-	}
+    public Boolean getFastLatest() {
+        return fastLatest;
+    }
 
-	public String getResumeKey() {
-		return resumeKey;
-	}
+    public void setFastLatest(Boolean fastLatest) {
+        this.fastLatest = fastLatest;
+    }
 
-	public void setResumeKey(String resumeKey) {
-		this.resumeKey = resumeKey;
-	}
+    public String getFl() {
+        return fl;
+    }
 
-	public boolean isShowResumeKey() {
-		return showResumeKey;
-	}
+    public void setFl(String fl) {
+        this.fl = fl;
+    }
 
-	public void setShowResumeKey(boolean showResumeKey) {
-		this.showResumeKey = showResumeKey;
-	}
+    public int getPage() {
+        return page;
+    }
 
-	public int getCollapseTime() {
-		return collapseTime;
-	}
+    public void setPage(int page) {
+        this.page = page;
+    }
 
-	public void setCollapseTime(int collapseTime) {
-		this.collapseTime = collapseTime;
-	}
+    public int getPageSize() {
+        return pageSize;
+    }
+
+    public void setPageSize(int pageSize) {
+        this.pageSize = pageSize;
+    }
+
+    public boolean isShowNumPages() {
+        return showNumPages;
+    }
+
+    public void setShowNumPages(boolean showNumPages) {
+        this.showNumPages = showNumPages;
+    }
+
+    public boolean isShowPagedIndex() {
+        return showPagedIndex;
+    }
+
+    public void setShowPagedIndex(boolean showPagedIndex) {
+        this.showPagedIndex = showPagedIndex;
+    }
+
+    public String getResumeKey() {
+        return resumeKey;
+    }
+
+    public void setResumeKey(String resumeKey) {
+        this.resumeKey = resumeKey;
+    }
+
+    public boolean isShowResumeKey() {
+        return showResumeKey;
+    }
+
+    public void setShowResumeKey(boolean showResumeKey) {
+        this.showResumeKey = showResumeKey;
+    }
+
+    public int getCollapseTime() {
+        return collapseTime;
+    }
+
+    public void setCollapseTime(int collapseTime) {
+        this.collapseTime = collapseTime;
+    }
 }

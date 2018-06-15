@@ -20,7 +20,7 @@
 package org.archive.wayback.replay;
 
 import org.archive.wayback.replay.TagMagix;
-import org.archive.wayback.archivalurl.ArchivalUrlResultURIConverter;
+import org.archive.wayback.archivalurl.ArchivalUrlReplayURIConverter;
 
 import junit.framework.TestCase;
 
@@ -321,7 +321,7 @@ public class TagMagixTest extends TestCase {
 		checkCSSMarkup("@import url(\r\n\"http://foo.com/f.css\"\n\r);",
 				"@import url(\r\n\"http://web.archive.org/wayback/2004/http://foo.com/f.css\"\n\r);",
 				"http://web.archive.org/wayback/","2004","http://foo.com/");
-		
+
 		checkCSSMarkup("@import \"http://foo.com/f.css\";",
 				"@import \"http://web.archive.org/wayback/2004/http://foo.com/f.css\";",
 				"http://web.archive.org/wayback/","2004","http://foo.com/");
@@ -348,8 +348,27 @@ public class TagMagixTest extends TestCase {
 		checkCSSMarkup("background: #9caad1 url('/~alabama/images/bg.jpg') 0 0 repeat-y;",
 				"background: #9caad1 url('http://web.archive.org/wayback/2004/http://foo.com/~alabama/images/bg.jpg') 0 0 repeat-y;",
 				"http://web.archive.org/wayback/","2004","http://foo.com/b/");
-		
-		
+
+		// url path with "()" in path
+		checkStyleUrlMarkup("background: #9caad1 url(/css/b(foo).gif) 0 0 repeat-y;",
+				"background: #9caad1 url(http://w.a.org/wb/2004/http://f.au/css/b(foo).gif) 0 0 repeat-y;",
+				"http://w.a.org/wb/","2004","http://f.au/");
+
+		// url path with "()" in path and compressed with other rules
+		checkStyleUrlMarkup("h1{background: #9caad1 url('/css/b(foo).gif')}p{display:block}",
+				"h1{background: #9caad1 url('http://w.a.org/wb/2004/http://f.au/css/b(foo).gif')}p{display:block}",
+				"http://w.a.org/wb/","2004","http://f.au/");
+
+		// url path with "()" in path and first in list
+		checkStyleUrlMarkup("h1{background: #9caad1 url('/css/b(foo).gif'),default !important}p{display:block}",
+				"h1{background: #9caad1 url('http://w.a.org/wb/2004/http://f.au/css/b(foo).gif'),default !important}p{display:block}",
+				"http://w.a.org/wb/","2004","http://f.au/");
+
+		// url path with "()" in path and marked !important
+		checkStyleUrlMarkup("h1{background: #9caad1 url('/css/b(foo).gif')!important}p{display:block}",
+				"h1{background: #9caad1 url('http://w.a.org/wb/2004/http://f.au/css/b(foo).gif')!important}p{display:block}",
+				"http://w.a.org/wb/","2004","http://f.au/");
+
 		// don't convert @namespace urls
 		checkCSSMarkup("@namespace url(\r\n\"http://www.w3.org/1999/xhtml\"\n\r);",
 				"@namespace url(\r\n\"http://www.w3.org/1999/xhtml\"\n\r);",
@@ -375,6 +394,7 @@ public class TagMagixTest extends TestCase {
 		checkStyleUrlMarkup("<table style=\"background: url(css/b.gif)\"></table>",
 				"<table style=\"background: url(http://w.a.org/wb/2004/http://f.au/css/b.gif)\"></table>",
 				"http://w.a.org/wb/","2004","http://f.au/");
+
 		// path relative, meaningful:
 		checkStyleUrlMarkup("<table style=\"background: url(css/b.gif)\"></table>",
 				"<table style=\"background: url(http://w.a.org/wb/2004/http://f.au/b/css/b.gif)\"></table>",
@@ -389,7 +409,12 @@ public class TagMagixTest extends TestCase {
 		checkStyleUrlMarkup("<table style='background: url(/css/b.gif)'></table>",
 				"<table style='background: url(http://w.a.org/wb/2004/http://f.au/css/b.gif)'></table>",
 				"http://w.a.org/wb/","2004","http://f.au/");
-		
+
+		// url path with "()" in path
+		checkStyleUrlMarkup("<table style='background: url(/css/b(foo).gif)'></table>",
+				"<table style='background: url(http://w.a.org/wb/2004/http://f.au/css/b(foo).gif)'></table>",
+				"http://w.a.org/wb/","2004","http://f.au/");
+
 		// quote attribute, apos url:
 		checkStyleUrlMarkup("<table style=\"background: url('/css/b.gif')\"></table>",
 				"<table style=\"background: url('http://w.a.org/wb/2004/http://f.au/css/b.gif')\"></table>",
@@ -458,7 +483,7 @@ public class TagMagixTest extends TestCase {
 	
 	private void checkCSSMarkup(String orig, String want,String prefix, String ts, String url) {
 		StringBuilder buf = new StringBuilder(orig);
-		ArchivalUrlResultURIConverter uriC = new ArchivalUrlResultURIConverter();
+		ArchivalUrlReplayURIConverter uriC = new ArchivalUrlReplayURIConverter();
 		uriC.setReplayURIPrefix(prefix);
 		TagMagix.markupCSSImports(buf, uriC, ts, url);
 		TagMagix.markupStyleUrls(buf,uriC,ts,url);
@@ -468,7 +493,7 @@ public class TagMagixTest extends TestCase {
 	
 	private void checkStyleOnlyUrlMarkup(String orig, String want, String prefix, String ts, String url) {
 		StringBuilder buf = new StringBuilder(orig);
-		ArchivalUrlResultURIConverter uriC = new ArchivalUrlResultURIConverter();
+		ArchivalUrlReplayURIConverter uriC = new ArchivalUrlReplayURIConverter();
 		uriC.setReplayURIPrefix(prefix);
 		TagMagix.markupStyleUrls(buf,uriC,ts,url);
 		String marked = buf.toString();
@@ -477,7 +502,7 @@ public class TagMagixTest extends TestCase {
 
 	private void checkStyleUrlMarkup(String orig, String want,String prefix, String ts, String url) {
 		StringBuilder buf = new StringBuilder(orig);
-		ArchivalUrlResultURIConverter uriC = new ArchivalUrlResultURIConverter();
+		ArchivalUrlReplayURIConverter uriC = new ArchivalUrlReplayURIConverter();
 		uriC.setReplayURIPrefix(prefix);
 		TagMagix.markupCSSImports(buf, uriC, ts, url);
 		TagMagix.markupStyleUrls(buf, uriC, ts, url);
@@ -487,7 +512,7 @@ public class TagMagixTest extends TestCase {
 	
 	private void checkMarkup(String orig, String want, String tag, String attr, String prefix, String ts, String url) {
 		StringBuilder buf = new StringBuilder(orig);
-		ArchivalUrlResultURIConverter uriC = new ArchivalUrlResultURIConverter();
+		ArchivalUrlReplayURIConverter uriC = new ArchivalUrlReplayURIConverter();
 		uriC.setReplayURIPrefix(prefix);
 		TagMagix.markupTagREURIC(buf,uriC,ts,url,tag,attr);
 		String marked = buf.toString();

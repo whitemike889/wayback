@@ -2,8 +2,8 @@
  *  This file is part of the Wayback archival access software
  *   (http://archive-access.sourceforge.net/projects/wayback/).
  *
- *  Licensed to the Internet Archive (IA) by one or more individual 
- *  contributors. 
+ *  Licensed to the Internet Archive (IA) by one or more individual
+ *  contributors.
  *
  *  The IA licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
@@ -21,38 +21,56 @@ package org.archive.wayback.replay.html.transformer;
 
 import junit.framework.TestCase;
 
+import org.archive.wayback.core.CaptureSearchResult;
+import org.archive.wayback.replay.html.transformer.JSStringTransformerTest.ReplayParseContextMock;
+import org.easymock.EasyMock;
+
 /**
  * @author brad
- *
+ * @author kenji
  */
 public class MetaRefreshUrlStringTransformerTest extends TestCase {
 
-	/**
-	 * Test method for {@link org.archive.wayback.replay.html.transformer.MetaRefreshUrlStringTransformer#transform(org.archive.wayback.replay.html.ReplayParseContext, java.lang.String)}.
-	 */
-	public void testTransform() {
-//		cmpT("0; url=http://foo.com/bar","0; url=(((http://foo.com/bar)))");
-//		cmpT("0; url=/bar","0; url=(((/bar)))");
-//		cmpT("0; url =/bar","0; url =(((/bar)))");
-//		cmpT("0;  url =/bar","0;  url =(((/bar)))");
-//		cmpT(";  url =/bar",";  url =/bar");
-//		cmpT("0;  URL =/bar","0;  URL =(((/bar)))");
-//
-//		cmpT("0; URL = /bar","0; URL = (((/bar)))");
-//		cmpT("0; URL = /bar ","0; URL = (((/bar))) ");
-//		cmpT("0; URL = /bar   ","0; URL = (((/bar)))   ");
-//		cmpT("0; URL = /baz foo","0; URL = (((/baz foo)))");
-//		cmpT("0; URL = /baz foo ","0; URL = (((/baz foo))) ");
-//		cmpT("0; URL=/baz foo ","0; URL=(((/baz foo))) ");
-//
-//		cmpT("0; UrL=/baz foo ","0; UrL=(((/baz foo))) ");
-//		cmpT("0; UrL=/baZefoo ","0; UrL=(((/baZefoo))) ");
-		
-	}
-	private void cmpT(String source, String want) {
-		MetaRefreshUrlStringTransformer m = new MetaRefreshUrlStringTransformer();
-		String got = m.transform(null,source);
-		assertEquals(want, got);
+	String baseURL;
+	ReplayParseContextMock rpc;
+	CaptureSearchResult result;
+	MetaRefreshUrlStringTransformer st;
+
+	@Override
+	protected void setUp() throws Exception {
+		baseURL = "http://foo.com/";
+		rpc = new ReplayParseContextMock();
+
+		st = new MetaRefreshUrlStringTransformer();
 	}
 
+	public void testTransformFull() throws Exception {
+		final String input = "0; URL=https://www.example.com/content";
+		EasyMock.expect(
+			rpc.mock.contextualizeUrl("https://www.example.com/content", ""))
+			.andReturn("https://www.example.com/content");
+		EasyMock.replay(rpc.mock);
+
+		st.transform(rpc, input);
+	}
+
+	public void testTransformVariations() throws Exception {
+		final String[][] cases = new String[][] {
+				{ "0; url=/bar", "/bar" },
+				{ "10; url =/bar", "/bar" },
+				{ "2;url=/bar", "/bar" },
+				// do we want to allow this?
+				//{ "; url=/bar", "/bar" },
+				{ "0; URL=/bar", "/bar" },
+				{ "0; url='/bar'", "/bar" },
+				{ "0; url=\"/bar\"", "/bar" },
+		};
+		for (String[] c : cases) {
+			EasyMock.expect(rpc.mock.contextualizeUrl(c[1], "")).andReturn(c[1]);
+			EasyMock.replay(rpc.mock);
+			st.transform(rpc, c[0]);
+
+			EasyMock.reset(rpc.mock);
+		}
+	}
 }

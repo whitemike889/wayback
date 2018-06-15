@@ -18,59 +18,50 @@
  *  limitations under the License.
  */
 
-/** 
- * 
- * Provide a wrapper for a Resource that is gzip encoded, that is,
- * Resources that have the header:
- * Content-Type: gzip
- * 
- * Used by TextReplayRenderers and other ReplayRenderers that add content to the resulting output
- * 
- */
-
 package org.archive.wayback.replay;
 
 import java.io.IOException;
-import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 
 import org.archive.wayback.core.Resource;
 
-public class GzipDecodingResource extends Resource {
+/**
+ * Provide a wrapper for a Resource that is gzip encoded, that is,
+ * Resources that have the header:
+ * Content-Type: gzip
+ *
+ * Used by TextReplayRenderers and other ReplayRenderers that add content to the resulting output
+ */
+public class GzipDecodingResource extends DecodingResource {
 	
+	private static final Logger LOGGER = Logger.getLogger(GzipDecodingResource.class.getName());
+
 	public static final String GZIP = "gzip";
 	
-	private Resource source;
-	
-	public GzipDecodingResource(Resource source)
-	{
-		this.source = source;
-	
+	public GzipDecodingResource(Resource source) {
+		super(source);
+		// 2 for GZIP MAGIC bytes.
+		source.mark(2);
 		try {
 			this.setInputStream(new GZIPInputStream(source));
 		} catch (IOException io) {
 			// If can't read as gzip, might as well as send back raw data.
+			if (LOGGER.isLoggable(Level.FINE)) {
+				LOGGER.fine("GZIPInputStream failed on " + source + " (" +
+						io.getMessage() + ")");
+			}
+			try {
+				source.reset();
+			} catch (IOException ex) {
+				LOGGER.log(Level.WARNING,
+					"reset() failed after GZIPInputStream threw IOException (" +
+							io.getMessage() + ") on " + source +
+							" (likely to lose first few bytes)", ex);
+			}
 			this.setInputStream(source);
 		}
 	}
 
-	@Override
-	public long getRecordLength() {
-		return source.getRecordLength();
-	}
-
-	@Override
-	public Map<String, String> getHttpHeaders() {
-		return source.getHttpHeaders();
-	}
-
-	@Override
-	public void close() throws IOException {
-		source.close();		
-	}
-
-	@Override
-	public int getStatusCode() {
-		return source.getStatusCode();
-	}
 }

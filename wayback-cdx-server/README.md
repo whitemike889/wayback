@@ -139,7 +139,7 @@ The matchType may also be set implicitly by using wildcard '*' at end or beginni
 ### Field Order ###
 
 It is possible to customize the fields returned from the cdx server using the **fl=** param.
-Simply pass in a comma seperate list of fields and only those fields will be returned:
+Simply pass in a comma separated list of fields and only those fields will be returned:
 
 * The following returns only the timestamp and mimetype fields with the header `["timestamp","mimetype"]` http://web.archive.org/cdx/search/cdx?url=archive.org&fl=timestamp,mimetype&output=json
 
@@ -178,7 +178,7 @@ Simply pass in a comma seperate list of fields and only those fields will be ret
 ### Collapsing ###
 
 A new form of filtering is the option to 'collapse' results based on a field, or a substring of a field.
-Collapsing is done on adjacent cdx lines where all captures after the first one that are duplicate are filtered ut.
+Collapsing is done on adjacent cdx lines where all captures after the first one that are duplicate are filtered out.
 This is useful for filtering out captures that are 'too dense' or when looking for unique captures.
 
 To use collapsing, add one or more **collapse=field** or **collapse=field:N** where N is the first N characters of *field* to test.
@@ -370,8 +370,9 @@ The *API-Key-Secret* can be set in the cdx server configuration.
 
 ## CDX Server Configuration ##
 
+
 TODO
 
-
+Start by editing the wayback-cdx-server-servlet.xml File in the WEB-INF Directory. Just put some valid CDX-Files in the cdxUris-List (Files must end with cdx or cdx.gz!) 
 
 

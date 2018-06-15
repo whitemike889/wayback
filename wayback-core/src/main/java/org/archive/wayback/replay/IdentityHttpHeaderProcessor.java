@@ -19,24 +19,29 @@
  */
 package org.archive.wayback.replay;
 
-import java.util.Map;
-
-import org.archive.wayback.ResultURIConverter;
-import org.archive.wayback.core.CaptureSearchResult;
+import java.util.Arrays;
+import java.util.HashSet;
 
 /**
  * HttpHeaderProcessor which passes through all headers as-is.
  *
+ * <p>{@code Transfer-Encoding} header is an exception. It is always dropped
+ * (or preserved by renaming if {@code prefix} is non-empty.) This is because
+ * Resource classes always produce original content, decoding transfer-encoding.</p>
+ * <p>TODO: This may not be the best place to drop {@code Transfer-Encoding}
+ * header. Maybe better done inside Resource classes, who <em>knows</em> it
+ * is decoding transfer-encoding.</p>
+ *
  * @author brad
- * @version $Date$, $Revision$
  */
-public class IdentityHttpHeaderProcessor implements HttpHeaderProcessor {
+public class IdentityHttpHeaderProcessor extends PreservingHttpHeaderProcessor {
 
-	/* (non-Javadoc)
-	 * @see org.archive.wayback.replay.HttpHeaderProcessor#filter(java.util.Map, java.lang.String, java.lang.String, org.archive.wayback.ResultURIConverter, org.archive.wayback.core.CaptureSearchResult)
-	 */
-	public void filter(Map<String, String> output, String key, String value,
-			ResultURIConverter uriConverter, CaptureSearchResult result) {
-		output.put(key, value);
+	public static final String[] DEFAULT_DROP_HEADERS = {
+		HTTP_TRANSFER_ENCODING_HEADER_UP
+	};
+
+	public IdentityHttpHeaderProcessor() {
+		dropHeaders = new HashSet<String>(Arrays.asList(DEFAULT_DROP_HEADERS));
 	}
+
 }

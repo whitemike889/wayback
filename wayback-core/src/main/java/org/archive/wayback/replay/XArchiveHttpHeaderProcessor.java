@@ -19,43 +19,43 @@
  */
 package org.archive.wayback.replay;
 
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 
-import org.archive.wayback.ResultURIConverter;
-import org.archive.wayback.core.CaptureSearchResult;
+/**
+ * {@link HttpHeaderProcessor} that renames all headers by prepending a prefix,
+ * except for a few <em>pass-through</em> headers.
+ * <p>
+ * Headers copied as-is:
+ * <ul>
+ * <li>{@code Content-Type}</li>
+ * <li>{@code Content-Disposition}</li>
+ * <li>{@code Content-Range}</li>
+ * </ul>
+ * Headers dropped if {@code prefix} is set to {@code null} or empty:
+ * <ul>
+ * <li>{@code Transfer-Encoding}</li>
+ * </ul>
+ * </p>
+ * <p>This is only useful for proxy mode, because it does not translate URLs found
+ * in headers like {@code Location}.</p>
+ * @see RedirectRewritingHttpHeaderProcessor
+ */
+public class XArchiveHttpHeaderProcessor extends PreservingHttpHeaderProcessor {
 
-public class XArchiveHttpHeaderProcessor implements HttpHeaderProcessor {
+	public static final String DEFAULT_PREFIX = "X-Wayback-Orig-";
 
-	private static String DEFAULT_PREFIX = "X-Wayback-Orig-";
-	private String prefix = DEFAULT_PREFIX; 
-	private Set<String> passThrough = null;
+	public static final String[] DEFAULT_DROP_HEADERS = {
+		HTTP_TRANSFER_ENCODING_HEADER_UP
+	};
+	public static final String[] DEFAULT_PASSTHROUGH_HEADERS = {
+		HTTP_CONTENT_TYPE_HEADER_UP, HTTP_CONTENT_DISP_HEADER_UP,
+		HTTP_CONTENT_RANGE_HEADER_UP
+	};
 	
 	public XArchiveHttpHeaderProcessor() {
-		passThrough = new HashSet<String>();
-		passThrough.add(HTTP_CONTENT_TYPE_HEADER_UP);
-		passThrough.add(HTTP_CONTENT_DISP_HEADER_UP);
-	}
-	
-	public String getPrefix() {
-		return prefix;
-	}
-
-	public void setPrefix(String prefix) {
-		this.prefix = prefix;
-	}
-
-	public void filter(Map<String, String> output, String key, String value,
-			ResultURIConverter uriConverter, CaptureSearchResult result) {
-		String keyUp = key.toUpperCase();
-
-		output.put(prefix + key,value);
-		if (passThrough.contains(keyUp)) {
-//			if (keyUp.startsWith(HTTP_CONTENT_TYPE_HEADER_UP)) {
-			// add this one as-is, too.
-			output.put(key, value);
-		}
+		prefix = DEFAULT_PREFIX;
+		dropHeaders = new HashSet<String>(Arrays.asList(DEFAULT_DROP_HEADERS));
+		passThroughHeaders = new HashSet<String>(Arrays.asList(DEFAULT_PASSTHROUGH_HEADERS));
 	}
 }

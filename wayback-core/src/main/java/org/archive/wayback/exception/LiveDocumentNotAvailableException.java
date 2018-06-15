@@ -2,8 +2,8 @@
  *  This file is part of the Wayback archival access software
  *   (http://archive-access.sourceforge.net/projects/wayback/).
  *
- *  Licensed to the Internet Archive (IA) by one or more individual 
- *  contributors. 
+ *  Licensed to the Internet Archive (IA) by one or more individual
+ *  contributors.
  *
  *  The IA licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
@@ -24,51 +24,125 @@ import java.net.URL;
 import javax.servlet.http.HttpServletResponse;
 
 /**
- *
+ * An error indicating Wayback has failed to load a resource from live Web.
+ * <p>Commonly thrown by user-facing live-web-proxy implementations, but also
+ * used by internal robots.txt access service.</p>
  *
  * @author brad
- * @version $Date$, $Revision$
  */
 public class LiveDocumentNotAvailableException extends WaybackException {
-	/**
-	 * 
-	 */
+
 	private static final long serialVersionUID = 1L;
 	protected static final String ID = "liveDocumentNotAvailable";
-	protected static final String defaultMessage = "Live document unavailable";
+	protected static final String DEFAULT_MESSAGE = "live document unavailable";
+
+	private String url;
+	private int statuscode = -1;
+
 	/**
-	 * Constructor
-	 * @param url 
-	 * @param code 
+	 * Construct exception with URL, details message and cause.
+	 * @param url URL of target live resource
+	 * @param message details of error causing this error
+	 * @param cause an exception causing this error (can be {@code null} if not applicable)
 	 */
-	public LiveDocumentNotAvailableException(URL url, int code) {
-		super("The URL " + url.toString() + " is not available(HTTP " + code +
-				" returned)",defaultMessage);
-		id = ID;
+	public LiveDocumentNotAvailableException(String url, String message, Throwable cause) {
+		super(message);
+		this.id = ID;
+		if (cause != null)
+			initCause(cause);
+		this.url = url;
 	}
-	/**
-	 * Constructor with message and details
-	 * @param url 
-	 * @param code 
-	 * @param details
-	 */
-	public LiveDocumentNotAvailableException(URL url, int code, String details){
-		super("The URL " + url.toString() + " is not available(HTTP " + code +
-				" returned)",defaultMessage,details);
-		id = ID;
-	}
-	/**
-	 * @param url
-	 */
-	public LiveDocumentNotAvailableException(String url){
-		super("The URL " + url + " is not available",defaultMessage);
-		id = ID;
+
+	public LiveDocumentNotAvailableException(String url, Throwable cause) {
+		this(url, DEFAULT_MESSAGE, cause);
 	}
 	
+	/**
+	 * Construct exception with URL and HTTP status code
+	 * @param url URL of target live resource
+	 * @param code HTTP status code returned by target server
+	 */
+	public LiveDocumentNotAvailableException(String url, int code) {
+		this(url, DEFAULT_MESSAGE, null);
+		this.statuscode = code;
+	}
+
+	/**
+	 * Construct exception with URL and HTTP status code
+	 * @param url URL of target live resource
+	 * @param code HTTP status code returned by target server
+	 */
+	public LiveDocumentNotAvailableException(URL url, int code) {
+		this(url.toString(), code);
+	}
+
+	/**
+	 * Construct exception with URL and details message.
+	 * @param url URL of target live resource
+	 * @param message details of an error causing this exception
+	 */
+	public LiveDocumentNotAvailableException(URL url, String message) {
+		this(url.toString(), message, null);
+	}
+
+	/**
+	 * Construct exception with URL and cause.
+	 * @param url URL of target live resource 
+	 * @param cause an exception causing this error.
+	 */
+	public LiveDocumentNotAvailableException(URL url, Throwable cause) {
+		this(url.toString(), cause);
+	}
+	
+	/**
+	 * Constructor with URL only.
+	 * Avoid using this constructor because details of the cause is
+	 * unavailable.
+	 * @param url URL of target live document
+	 * @deprecated 2016-06-09 use constructor with {@code cause} or {@code message}
+	 */
+	public LiveDocumentNotAvailableException(String url) {
+		super("The URL " + url + " is not available", DEFAULT_MESSAGE);
+		id = ID;
+	}
+
 	/**
 	 * @return the HTTP status code appropriate to this exception class.
 	 */
 	public int getStatus() {
 		return HttpServletResponse.SC_BAD_GATEWAY;
+	}
+
+	/**
+	 * Return the original HTTP status code that resulted in this
+	 * exception. Note that this returns -1 if this exception is
+	 * initialized through constructor without code argument. Use
+	 * <code>cause</code> for failure details.
+	 * Value zero is reserved for compatibility with old LiveWebCache
+	 * implementations. Don't use it in the new code.
+	 * @return HTTP status code, or -1 if not applicable.
+	 */
+	public int getOriginalStatuscode() {
+		return statuscode;
+	}
+
+	/**
+	 * return details message - includes.
+	 * @return details message
+	 */
+	public String getMessage() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(url != null ? url : "<unspecified url>");
+		String msg = super.getMessage();
+		if (msg != null) {
+			sb.append(": ").append(msg);
+		}
+		Throwable cause = getCause();
+		if (cause != null) {
+			sb.append(": ").append(cause.toString());
+		} else if (statuscode != -1) {
+			sb.append(": Status ").append(Integer.toString(statuscode));
+		}
+		return sb.toString();
 	}
 }
